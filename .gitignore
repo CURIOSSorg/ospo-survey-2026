@@ -9,6 +9,11 @@ __MACOSX/
 .LSOverride
 Icon[]
 
+# Quarto
+/.quarto/
+/_site/
+/_book/
+
 # History files
 .Rhistory
 .Rapp.history
@@ -60,4 +65,3 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
-/.quarto/
