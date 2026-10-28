@@ -6,27 +6,74 @@ title: "Initial raw data clean-up"
 
 This notebook describes my initial exploration and cleaning of the raw data from the fall 2026 CURIOSS OSPO survey.
 
-
 # Import packages and utilities
 ```{r}
 library(readxl)
+library(dplyr)
+library(docstring)
 ```
 
+# Define functions
+
+```{r}
+remove_uninformative_rows <- function(df) {
+  #' Removes rows that contain either
+  #' an NA object, an empty string, or a whitespace
+  #' string ("  ") in every column.
+  #'
+  #' @param df Data frame to process.
+  #' @return A copy of the data frame with
+  #' uninformative rows removed.
+  #'
+  df %>%
+    filter(if_any(everything(), function(x) {
+      val <- trimws(x) # trim whitespace
+      !is.na(val) & val != ""
+    }))
+}
+```
 
 # Read data from excel
 After receiving the data from Clare, a password-protected .xlsx file, I copied the data into a new excel file without password protection so R's readxl package could read it. That file is called raw_data.xlsx.
 
 ```{r}
-my_data <- readxl::read_excel("data/raw_data.xlsx")
+data <- readxl::read_excel("data/raw_data.xlsx", col_types = "text", na = c(""))
+# Using a workaround to preserve distinction between
+# "" and "N/A", because by default read_excel converts
+# both of these to NA objects.
+data[is.na(data)] <- ""
+data[data == "N/A"] <- NA
 ```
 
 Start exploring the data
 ```{r}
-dim(my_data)
-names(my_data)[1:15]
+dim(data)
+names(data)[1:15]
 ```
 
 My plan: \
-1. Create a text file that contains a single table for all of the responses to simple quantitative questions. (E.g., "campus".) \
+1. Create a text file that contains a single table for all of simple (multiple choice) quantitative questions. \
 2. For more complex quantitative questions, create one file/table per question. \
-3. Create a file/table for all qualitative questions. \
+3. Create a single file/table for all qualitative questions. \
+
+Remove uninformative columns
+
+```{r}
+cols_to_remove <- c(
+    "Response ID",
+    "Date submitted",
+    "Last page",
+    "Start language",
+    "Seed",
+    "Quota exit")
+
+data <- data %>% select(-any_of(cols_to_remove))
+dim(data)
+```
+
+Remove uninformative rows
+
+```{r}
+data <- remove_uninformative_rows(data)
+dim(data)
+```
