@@ -1,0 +1,32 @@
+---
+title: "Initial raw data clean-up"
+---
+
+# Overview
+
+This notebook describes my initial exploration and cleaning of the raw data from the fall 2026 CURIOSS OSPO survey.
+
+
+# Import packages and utilities
+```{r}
+library(readxl)
+```
+
+
+# Read data from excel
+After receiving the data from Clare, a password-protected .xlsx file, I copied the data into a new excel file without password protection so R's readxl package could read it. That file is called raw_data.xlsx.
+
+```{r}
+my_data <- readxl::read_excel("data/raw_data.xlsx")
+```
+
+Start exploring the data
+```{r}
+dim(my_data)
+names(my_data)[1:15]
+```
+
+My plan: \
+1. Create a text file that contains a single table for all of the responses to simple quantitative questions. (E.g., "campus".) \
+2. For more complex quantitative questions, create one file/table per question. \
+3. Create a file/table for all qualitative questions. \

@@ -1,6 +1,14 @@
 # Custom entries
 data/
 
+# MacOS
+.DS_Store
+.localized
+__MACOSX/
+.AppleDouble
+.LSOverride
+Icon[]
+
 # History files
 .Rhistory
 .Rapp.history
@@ -51,3 +59,5 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+/.quarto/

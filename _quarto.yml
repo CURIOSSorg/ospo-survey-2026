@@ -1,0 +1,6 @@
+project:
+  output-dir: notebook_pdfs
+  execute-dir: project
+format: 
+  html: default
+  pdf: default
