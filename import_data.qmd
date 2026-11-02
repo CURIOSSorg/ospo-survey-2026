@@ -6,30 +6,52 @@ title: "Initial raw data clean-up"
 
 This notebook describes my initial exploration and cleaning of the raw data from the fall 2026 CURIOSS OSPO survey.
 
-# Import packages and utilities
+# Import packages, utilities, and config variables
 ```{r}
 library(readxl)
 library(dplyr)
 library(docstring)
+library(config)
+
+# Read config.yml
+cfg <- config::get()
 ```
 
 # Define functions
 
 ```{r}
 remove_uninformative_rows <- function(df) {
-  #' Removes rows that contain either
-  #' an NA object, an empty string, or a whitespace
-  #' string ("  ") in every column.
-  #'
-  #' @param df Data frame to process.
-  #' @return A copy of the data frame with
-  #' uninformative rows removed.
-  #'
+  'Removes rows that contain either an NA object, an empty string, or a
+  whitespace string ("  ") in every column.
+  
+  @param df Data frame to process.
+  @return A copy of the data frame with
+  uninformative rows removed.
+  '
   df %>%
     filter(if_any(everything(), function(x) {
       val <- trimws(x) # trim whitespace
       !is.na(val) & val != ""
     }))
+}
+
+write_df_to_file <- function(df, filename) {
+  'Exports a given data frame as a plain, tab-delimited text file saved within
+  the directory specified by the `data_path` variable in config.yml.
+  Include .tsv extension when specifying filename.
+
+  @param df A data frame to be written to file.
+  @param filename A character string specifying the destination file name.
+
+  @return `NULL` (called for its side effect of writing a file).
+  '
+  write.table(
+    df,
+    file.path(cfg$data_path, filename),
+    quote = FALSE,
+    row.names = FALSE,
+    sep = "\t"
+  )
 }
 ```
 
@@ -45,7 +67,7 @@ data[is.na(data)] <- ""
 data[data == "N/A"] <- NA
 ```
 
-Start exploring the data
+# Initial exploration and clean-up
 ```{r}
 dim(data)
 names(data)[1:15]
@@ -76,4 +98,41 @@ Remove uninformative rows
 ```{r}
 data <- remove_uninformative_rows(data)
 dim(data)
+```
+
+Remove the very first response, which I suspect was a test by one of the survey organizers. The organization is listed as "dsad" and the email is "dsas", and the locations of those keys on a qwerty keyboard support my hypothesis that that was just some nonsense for a test run. The only question that that person answered was the "choose your top 3" drag-and-drop, so I assume an organizer was just testing that that question worked.
+
+```{r}
+data <- data %>% slice(-1)
+```
+
+# Simple multiple-choice
+
+I'll start with the simple multiple choice questions. I'll dump all of these in a single file called mc_simple.tsv.
+
+```{r}
+# Rather than indexing these questions based on column number, I'll grab them by the exact column header text.
+mc_simple_names_map <- c(
+  "scope" = "Who does your OSPO primarily serve?",
+  "age" = "How long has your OSPO been operating?",
+  "staff_time" = "Roughly how much total staff time is formally spent on OSPO or OSPO-like activities in your organization?",
+  "volunteers" = "Beyond that, roughly how many people regularly spend time on OSPO activities without being formally resourced?",
+  "expectations" = "Over the next two years, what do you expect to happen to your OSPO or OSPO-like function?",
+  "funding_duration" = "What is the time horizon of your current funding or allocation?",
+  "followup" = "If required, would you be willing to take part in an optional 45 to 60 minute follow-up interview exploring these topics in more depth?"
+)
+
+mc_simple_long_names = unlist(mc_simple_names_map, use.names = FALSE)
+
+mc_simple <- data %>% 
+  select(any_of(mc_simple_long_names))
+mc_simple <- mc_simple %>% rename(any_of(mc_simple_names_map))
+
+names(mc_simple)
+head(mc_simple)
+```
+
+
+```{r}
+write_df_to_file(mc_simple, 'mc_simple.tsv')
 ```
