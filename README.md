@@ -15,9 +15,9 @@ ospo-survey-2026/
 ├── config.yml            # Project configuration settings
 ├── import_data.qmd       # Notebook: Data cleaning and exploration
 ├── data/                 # Data (not checked into version control)
-│   ├── mc_complex.tsv    # Clean data file ready for analysis
-│   ├── mc_other.tsv      # Clean data file ready for analysis
-│   ├── mc_simple.tsv     # Clean data file ready for analysis
+│   ├── mc_complex.tsv    # Clean data file ready for analysis (example)
+│   ├── mc_other.tsv      # Clean data file ready for analysis (example)
+│   ├── mc_simple.tsv     # Clean data file ready for analysis (example)
 │   └── raw_data.xlsx     # Raw survey responses
 ├── notebook_pdfs/        # PDF copies of my notebooks
 ├── renv/                 # R environment configuration
@@ -30,4 +30,4 @@ ospo-survey-2026/
 2. Open the project and run `renv::restore()` to install dependencies.
 3. Create a data/ folder at the project root and list it in gitignore.
 4. Run the Quarto notebooks to process and analyze the survey data.
-5. If desired, render quarto notebooks to PDFs with `quarto render`.
+5. If desired, render quarto notebooks to PDFs with `quarto render <filename>`.
