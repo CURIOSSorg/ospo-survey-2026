@@ -28,7 +28,14 @@ ospo-survey-2026/
 
 1. Ensure R is installed.
 2. Open the project and run `renv::restore()` to install dependencies.
-3. Create a data/ folder at the project root and list it in gitignore.
-4. Create additional data subfolders. TODO
-5. Run the Quarto notebooks to process and analyze the survey data.
-6. If desired, render quarto notebooks to PDFs with `quarto render <filename>`.
+3. Create a `data/` folder at the project root and list it in gitignore.
+4. Put the raw data in an excel spreadsheet called "raw_data.xlsx", and put that
+   file in the `data/` folder.
+5. Create additional data subfolders. I have two: `coding` and
+   `manually curated`. List these paths in config.yml.
+6. Create a `mappings.xlsx` file. See `process_raw_data` for instructions on how
+   to do this.
+7. Run the Quarto notebooks to process and analyze the survey data. Start with
+   `process_raw_data.qmd`.
+8. If desired, render quarto notebooks to PDFs with `quarto render <filename>`.
+   This will also execute the script.

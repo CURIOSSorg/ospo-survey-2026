@@ -4,7 +4,7 @@ title: "Initial raw data clean-up"
 
 # Overview
 
-This notebook describes my tidying of the raw data from the fall 2026 CURIOSS OSPO survey. Mostly I'm just taking the data out of excel and writing it to tab-separated files for easy downstream analysis with r. I'm writing them to my data/ folder in the root of this project.
+This notebook describes my tidying of the raw data from the fall 2026 CURIOSS OSPO survey. Mostly I'm just taking the data out of excel and writing it to tab-separated files for easy downstream analysis with r. I'm writing them to my data/ folder in the root of this project. (Not checked into version control.)
 
 These data could go in a relational database, but why overcomplicate things? tsv files will do the job.
 
@@ -13,7 +13,6 @@ These data could go in a relational database, but why overcomplicate things? tsv
 library(readxl)
 library(dplyr)
 library(docstring)
-library(readr)
 library(stringr)
 
 source("utils.R")
@@ -21,10 +20,31 @@ source("utils.R")
 # Read config.yml
 cfg <- config::get()
 
-# Read the external mappings CSV
-# Expected columns: category, nickname, original_name
-mappings <- read_tsv(file.path(cfg$data_path, "mappings.tsv"), show_col_types = FALSE)
+# Read the external mappings file
+mappings <- read_excel(file.path(cfg$data_path, "mappings.xlsx"), sheet = "mappings")
 ```
+
+# Import question name mappings
+The column headers in the raw data are too long to be tractable in a programmatic environment. They need short nicknames without special characters or spaces. Rather than hard-coding those nicknames into this script, I am putting them in another excel file, to make it easy for a survey administrator to copy-paste the original survey questions here.
+
+The mappings file must be called `mappings.xlsx`. It has a single sheet named `mappings` with five columns: `nickname`, `root`, `tip`, `output_file`, and `category`.
+
+`nickname` is a short, unique, machine-friendly name for the column (no spaces or special characters).
+
+`root` is the question text as it appears in the survey. For questions with sub-items (e.g. select-all-that-apply or matrix questions), `root` is just the question stem — the part before the bracketed sub-item.
+
+`tip` is the sub-item text from inside the brackets, for questions that have them. Leave it empty for questions without sub-items. If the tip is exactly `Other`, that column is automatically routed to its `output_file` without any extra configuration.
+
+`output_file` is the basename of the TSV file this column should be written to (without the `.tsv` extension). For most questions this is the question group name (e.g. `comm_building`, `objectives`). Write-in "other" columns are collected into combined files: all SATA `[Other]` columns share `output_file = sata_other`, all `mc_complex` `[Other]` columns share `mc_other`, and matrix `[Other]` columns share `matrix_other`. Qualitative follow-up questions that don't belong to a question group can use `output_file = qual`.
+
+`category` describes the question type and must be one of these seven values:\
+`mc_simple`: simple multiple choice with no "other" write-in option.\
+`mc_complex`: multiple choice with an "other" write-in option.\
+`qual_pii`: qualitative responses with personally identifiable information of high sensitivity.\
+`qual`: other qualitative responses.\
+`matrix`: matrix questions.\
+`ranking`: drag-and-drop ranking questions (e.g. choose your top three).\
+`sata`: select-all-that-apply questions.
 
 # Define functions
 
@@ -85,13 +105,39 @@ select_and_rename <- function(df, name_map) {
   return(result)
 }
 
-get_mapping <- function(map_category, mapping_df) {
-  #' Generate a Named Vector from the Mappings Dataframe
-  #' 
-  #' @param map_category Character string matching the 'category' column.
-  #' @param mapping_df The dataframe containing all mappings.
+reconstruct_original_name <- function(root, tip) {
+  #' Reconstruct Original Survey Column Name
+  #'
+  #' @description
+  #' Combines a question root and an optional tip (sub-item text) into the
+  #' verbatim column header used in the raw survey export. If tip is NA or
+  #' empty, the root is returned as-is. Otherwise, returns "root [tip]".
+  #'
+  #' @param root Character string: the question stem.
+  #' @param tip  Character string or NA: the bracketed sub-item text.
+  #' @return A character string matching the raw survey column header.
+  if (is.na(tip) || trimws(tip) == "") {
+    return(root)
+  }
+  paste0(root, " [", tip, "]")
+}
+
+get_name_map <- function(out_file, mapping_df) {
+  #' Generate a Named Vector of Column Mappings for an Output File
+  #'
+  #' @description
+  #' Filters the mappings table to rows with the given output_file, reconstructs
+  #' the original survey column name from root and tip, and returns a named
+  #' vector of the form c(nickname = original_name) suitable for use with
+  #' select_and_rename().
+  #'
+  #' @param out_file   Character string matching the 'output_file' column.
+  #' @param mapping_df The mappings data frame.
   #' @return A named character vector.
-  subset_df <- mapping_df |> filter(category == map_category)
+  subset_df <- mapping_df |>
+    filter(output_file == out_file) |>
+    mutate(original_name = mapply(reconstruct_original_name, root, tip))
+
   setNames(subset_df$original_name, subset_df$nickname)
 }
 ```
@@ -112,13 +158,16 @@ data <- data |>
   mutate(across(where(is.character), ~ str_replace_all(.x, "[\r\n]+", " ")))
 ```
 
-# Initial exploration and clean-up
+# Initial clean-up
+
+Let's just look at the data first.
+
 ```{r}
 dim(data)
 names(data)[1:15]
 ```
 
-Remove uninformative columns
+Remove uninformative columns.
 
 ```{r}
 cols_to_remove <- c(
@@ -133,7 +182,7 @@ data <- data |> select(-any_of(cols_to_remove))
 dim(data)
 ```
 
-Remove uninformative rows
+Remove uninformative rows.
 
 ```{r}
 data <- remove_uninformative_rows(data)
@@ -152,230 +201,23 @@ Remove HTML <p> tags that are present in some of the responses (presumably a bug
 data <- clean_p_tags(data)
 ```
 
-# Simple multiple-choice
-
-I'll start with the simple multiple choice questions. I'll dump all of these in a single file called mc_simple.tsv.
+Remove me! I was just clicking around to view the survey, I was not actually taking it.
 
 ```{r}
-mc_simple_names_map <- get_mapping("mc_simple", mappings)
-mc_simple <- select_and_rename(data, mc_simple_names_map)
-write_df_to_file(mc_simple, 'mc_simple.tsv')
+data <- data |>
+  filter(`Your email` != "virginiascarlett@ucsb.edu")
 ```
 
-# Complex multiple-choice
+# Write output files
 
-Now let's create a couple more files for the multiple choice questions that had an "other" write-in option. mc_complex.tsv will have just the multiple-choice part of these "complex" multiple choice questions. mc_other.tsv has the corresponding "other" responses where people wrote-in additional info.
-
-```{r}
-mc_complex_names_map <- get_mapping("mc_complex", mappings)
-mc_other_names_map <- get_mapping("mc_other", mappings)
-
-mc_complex <- select_and_rename(data, mc_complex_names_map)
-mc_other <- select_and_rename(data, mc_other_names_map)
-
-write_df_to_file(mc_complex, 'mc_complex.tsv')
-write_df_to_file(mc_other, 'mc_other.tsv')
-```
-
-# Qualitative responses
-
-Let's put the qualitative responses (not associated with a multiple-choice (MC) or select-all-that-apply (SATA) question) in their own file. I like to split obvious personally identifiable information (PII) into its own file, just to mitigate the potential bias introduced by looking at it while I'm reading the responses.
+Each row in the mappings table specifies which output file a survey column belongs to. The loop below iterates over each distinct `output_file` value, extracts the corresponding columns from the data, and writes them to a TSV file. The order of output files follows their first appearance in the mappings table.
 
 ```{r}
-qual_pii_names_map <- get_mapping("qual_pii", mappings)
-qual_pii <- select_and_rename(data, qual_pii_names_map)
-write_df_to_file(qual_pii, 'qual_pii.tsv')
+output_files <- unique(mappings$output_file)
 
-qual_names_map <- get_mapping("qual", mappings)
-qual <- select_and_rename(data, qual_names_map)
-write_df_to_file(qual, 'qual.tsv')
-```
-
-# Matrix questions
-
-Now let's put the matrix questions in their own files. Since these questions are complex, I'm going to give each question its own file.
-
-Just like the "complex" multiple-choice questions, these questions also have an "other" write-in option, so I will put these in a separate and corresponding file.
-
-```{r}
-objectives_name_map <- get_mapping("objectives", mappings)
-objectives <- select_and_rename(data, objectives_name_map)
-write_df_to_file(objectives, 'objectives.tsv')
-
-blockers_names_map <- get_mapping("blockers", mappings)
-blockers <- select_and_rename(data, blockers_names_map)
-write_df_to_file(blockers, 'blockers.tsv')
-
-matrix_other_names_map <- get_mapping("matrix_other", mappings)
-matrix_other <- select_and_rename(data, matrix_other_names_map)
-write_df_to_file(matrix_other, 'matrix_other.tsv')
-```
-
-# Ranking question
-
-I think this question merits its own file: "Of the activities above, which take the most of your own time? Rank your top three."
-
-```{r}
-ranking_name_map <- get_mapping("ranking", mappings)
-ranking <- select_and_rename(data, ranking_name_map)
-write_df_to_file(ranking, 'ranking.tsv')
-```
-
-# SATA questions
-
-There were a lot of SATA (Select All That Apply) questions, each with an "other" option. Individually, they are not very complicated, but together, they are complex enough that I'd like to put them in separate files.
-
-I'll put all the "other" responses to these SATA questions in a single file called sata_other.tsv.
-
-## OSPO location
-
-```{r}
-ospo_location_names_map <- get_mapping("ospo_location", mappings)
-ospo_location <- select_and_rename(data, ospo_location_names_map)
-write_df_to_file(ospo_location, 'ospo_location.tsv')
-
-ospo_location_other_names_map <- get_mapping("ospo_location_other", mappings)
-ospo_location_other <- select_and_rename(data, ospo_location_other_names_map)
-
-sata_other <- ospo_location_other
-```
-
-## Professional background
-
-```{r}
-prof_bg_names_map <- get_mapping("prof_bg", mappings)
-prof_bg <- select_and_rename(data, prof_bg_names_map)
-write_df_to_file(prof_bg, 'prof_bg.tsv')
-
-prof_bg_other_names_map <- get_mapping("prof_bg_other", mappings)
-prof_bg_other <- select_and_rename(data, prof_bg_other_names_map)
-
-sata_other <- cbind(sata_other, prof_bg_other)
-```
-
-## OSPO funding
-
-```{r}
-ospo_funding_names_map <- get_mapping("ospo_funding", mappings)
-ospo_funding <- select_and_rename(data, ospo_funding_names_map)
-write_df_to_file(ospo_funding, 'ospo_funding.tsv')
-
-ospo_funding_other_names_map <- get_mapping("ospo_funding_other", mappings)
-ospo_funding_other <- select_and_rename(data, ospo_funding_other_names_map)
-
-sata_other <- cbind(sata_other, ospo_funding_other)
-```
-
-## Best practices
-
-```{r}
-best_practices_names_map <- get_mapping("best_practices", mappings)
-best_practices <- select_and_rename(data, best_practices_names_map)
-write_df_to_file(best_practices, 'best_practices.tsv')
-
-best_practices_other_names_map <- get_mapping("best_practices_other", mappings)
-best_practices_other <- select_and_rename(data, best_practices_other_names_map)
-
-sata_other <- cbind(sata_other, best_practices_other)
-```
-
-## Educational efforts
-```{r}
-edu_efforts_names_map <- get_mapping("edu_efforts", mappings)
-edu_efforts <- select_and_rename(data, edu_efforts_names_map)
-write_df_to_file(edu_efforts, 'edu_efforts.tsv')
-
-edu_efforts_other_names_map <- get_mapping("edu_efforts_other", mappings)
-edu_efforts_other <- select_and_rename(data, edu_efforts_other_names_map)
-
-sata_other <- cbind(sata_other, edu_efforts_other)
-```
-
-## External partnerships and tech transfer
-```{r}
-ext_partnerships_names_map <- get_mapping("ext_partnerships", mappings)
-ext_partnerships <- select_and_rename(data, ext_partnerships_names_map)
-write_df_to_file(ext_partnerships, 'ext_partnerships.tsv')
-
-ext_partnerships_other_names_map <- get_mapping("ext_partnerships_other", mappings)
-ext_partnerships_other <- select_and_rename(data, ext_partnerships_other_names_map)
-
-sata_other <- cbind(sata_other, ext_partnerships_other)
-```
-
-## Supporting tools and infrastructure
-```{r}
-tools_infra_names_map <- get_mapping("tools_infra", mappings)
-tools_infra <- select_and_rename(data, tools_infra_names_map)
-write_df_to_file(tools_infra, 'tools_infra.tsv')
-
-tools_infra_other_names_map <- get_mapping("tools_infra_other", mappings)
-tools_infra_other <- select_and_rename(data, tools_infra_other_names_map)
-
-sata_other <- cbind(sata_other, tools_infra_other)
-```
-
-## Community building
-```{r}
-comm_building_names_map <- get_mapping("comm_building", mappings)
-comm_building <- select_and_rename(data, comm_building_names_map)
-write_df_to_file(comm_building, 'comm_building.tsv')
-
-comm_building_other_names_map <- get_mapping("comm_building_other", mappings)
-comm_building_other <- select_and_rename(data, comm_building_other_names_map)
-
-sata_other <- cbind(sata_other, comm_building_other)
-```
-
-## Directly supporting open source projects
-```{r}
-project_support_names_map <- get_mapping("project_support", mappings)
-project_support <- select_and_rename(data, project_support_names_map)
-write_df_to_file(project_support, 'project_support.tsv')
-
-project_support_other_names_map <- get_mapping("project_support_other", mappings)
-project_support_other <- select_and_rename(data, project_support_other_names_map)
-
-sata_other <- cbind(sata_other, project_support_other)
-```
-
-## Advocacy and policy
-```{r}
-advocacy_policy_names_map <- get_mapping("advocacy_policy", mappings)
-advocacy_policy <- select_and_rename(data, advocacy_policy_names_map)
-write_df_to_file(advocacy_policy, 'advocacy_policy.tsv')
-
-advocacy_policy_other_names_map <- get_mapping("advocacy_policy_other", mappings)
-advocacy_policy_other <- select_and_rename(data, advocacy_policy_other_names_map)
-
-sata_other <- cbind(sata_other, advocacy_policy_other)
-```
-
-## Funding and financial support
-```{r}
-funding_support_names_map <- get_mapping("funding_support", mappings)
-funding_support <- select_and_rename(data, funding_support_names_map)
-write_df_to_file(funding_support, 'funding_support.tsv')
-
-funding_support_other_names_map <- get_mapping("funding_support_other", mappings)
-funding_support_other <- select_and_rename(data, funding_support_other_names_map)
-
-sata_other <- cbind(sata_other, funding_support_other)
-```
-
-## OSPO operations and strategy
-```{r}
-ospo_ops_names_map <- get_mapping("ospo_ops", mappings)
-ospo_ops <- select_and_rename(data, ospo_ops_names_map)
-write_df_to_file(ospo_ops, 'ospo_ops.tsv')
-
-ospo_ops_other_names_map <- get_mapping("ospo_ops_other", mappings)
-ospo_ops_other <- select_and_rename(data, ospo_ops_other_names_map)
-
-sata_other <- cbind(sata_other, ospo_ops_other)
-```
-
-## Write SATA 'other' responses to a single file
-```{r}
-write_df_to_file(sata_other, 'sata_other.tsv')
+for (out_file in output_files) {
+  name_map <- get_name_map(out_file, mappings)
+  df <- select_and_rename(data, name_map)
+  write_df_to_file(df, paste0(out_file, ".tsv"))
+}
 ```
