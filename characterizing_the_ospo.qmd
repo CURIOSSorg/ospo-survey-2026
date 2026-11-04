@@ -1,0 +1,22 @@
+---
+title: "Characterizing the academic OSPO in 2026"
+---
+
+# Overview
+
+Here I am getting some background on the size and status of surveyed OSPOs.
+
+Research questions:\
+- Where are university OSPOs located within their university?\
+- How many of the organizations have an OSPO or dedicated OSPO staff? How many organizations just have staff doing OSPO-like work as part of another role?\
+- How old are the OSPOs?\
+- How big are the OSPOs?\
+- What fraction of OSPO contributors are volunteers?\
+
+Relevant survey questions:\
+- Which best describes the open source function at your organization?\
+- What is the open source enabling function called within your organization?\
+- Where is your OSPO located within your university?\
+- How long has your OSPO been operating?\
+- Roughly how much total staff time is formally spent on OSPO or OSPO-like activities in your organization?\
+- Beyond that, roughly how many people regularly spend time on OSPO activities without being formally resourced?\
