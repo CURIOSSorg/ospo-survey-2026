@@ -8,21 +8,22 @@ This notebook describes my tidying of the raw data from the fall 2026 CURIOSS OS
 
 These data could go in a relational database, but why overcomplicate things? tsv files will do the job.
 
-TODO: Need to remove the HTML paragraph tags
-
 # Import packages, utilities, and config variables
 ```{r}
 library(readxl)
 library(dplyr)
 library(docstring)
 library(readr)
+library(stringr)
+
+source("utils.R")
 
 # Read config.yml
 cfg <- config::get()
 
 # Read the external mappings CSV
 # Expected columns: category, nickname, original_name
-mappings <- read_tsv("data/mappings.tsv", show_col_types = FALSE)
+mappings <- read_tsv(file.path(cfg$data_path, "mappings.tsv"), show_col_types = FALSE)
 ```
 
 # Define functions
@@ -43,26 +44,32 @@ remove_uninformative_rows <- function(df) {
     }))
 }
 
-write_df_to_file <- function(df, filename) {
-  #' Write data frame to a tsv file
-  #' 
-  #' @description
-  #' Exports a given data frame as a plain, tab-delimited text file saved within
-  #' the directory specified by the `data_path` variable in config.yml.
-  #' Include .tsv extension when specifying filename.
-  #' 
-  #' @param df A data frame to be written to file.
-  #' @param filename A character string specifying the destination file name.
-  #' 
-  #' @return `NULL` (called for its side effect of writing a file).
+clean_p_tags <- function(df) {
+  #' Clean HTML P Tags from Data Frame Entries
+  #'
+  #' Removes opening `<p>` (including any HTML attributes) and closing `</p>` tags 
+  #' from the start and end of all character or factor columns in a data frame.
+  #'
+  #' @param df A data frame containing character or factor columns to clean.
+  #'
+  #' @return A data frame with outer `<p>` and `</p>` tags stripped from all string entries.
+  #'
+  #' @examples
+  #' df <- data.frame(
+  #'   title = c("<p>First Title</p>", "Second Title"),
+  #'   description = c("<p class='intro'>Body text</p>", "No tags")
+  #' )
+  #' clean_p_tags(df)
   
-  write.table(
-    df,
-    file.path(cfg$data_path, filename),
-    quote = FALSE,
-    row.names = FALSE,
-    sep = "\t"
-  )
+  df[] <- lapply(df, function(col) {
+    if (is.character(col) || is.factor(col)) {
+      # Remove leading <p> (with optional attributes/whitespace) and trailing </p>
+      col <- gsub("^\\s*<p[^>]*>", "", col, ignore.case = TRUE)
+      col <- gsub("</p>\\s*$", "", col, ignore.case = TRUE)
+    }
+    return(col)
+  })
+  return(df)
 }
 
 select_and_rename <- function(df, name_map) {
@@ -92,7 +99,6 @@ get_mapping <- function(map_category, mapping_df) {
 # Read data from excel
 After receiving the data from Clare, a password-protected .xlsx file, I copied the data into a new excel file without password protection so R's readxl package could read it. That file is called raw_data.xlsx.
 
-
 ```{r}
 data <- readxl::read_excel("data/raw_data.xlsx", col_types = "text", na = c(""))
 # Using a workaround to preserve distinction between
@@ -100,6 +106,10 @@ data <- readxl::read_excel("data/raw_data.xlsx", col_types = "text", na = c(""))
 # both of these to NA objects.
 data[is.na(data)] <- ""
 data[data == "N/A"] <- NA
+
+# Remove Windows line endings (\r\n), Unix line endings (\n), and carriage returns (\r).
+data <- data |>
+  mutate(across(where(is.character), ~ str_replace_all(.x, "[\r\n]+", " ")))
 ```
 
 # Initial exploration and clean-up
@@ -134,6 +144,12 @@ Remove the very first response, which I suspect was a test by one of the survey 
 
 ```{r}
 data <- data |> slice(-1)
+```
+
+Remove HTML <p> tags that are present in some of the responses (presumably a bug from limesurvey).
+
+```{r}
+data <- clean_p_tags(data)
 ```
 
 # Simple multiple-choice

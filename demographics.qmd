@@ -1,0 +1,141 @@
+---
+title: "Demographics"
+---
+
+# Overview
+
+Here is my initial exploration of participant demographics.
+
+Here are my research questions:\
+- How many respondents took the survey, and from how many institutions?\
+- Which regions are those institutions located in?\
+- What roles do our respondents represent?\
+- What are our respondents' professional backgrounds?\
+
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(docstring)
+library(readr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+
+# Load data
+
+```{r}
+mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE)
+mc_other <- read_tsv(file.path(cfg$data_path, "mc_other.tsv"), show_col_types = FALSE)
+prof_bg <- read_tsv(file.path(cfg$data_path, "prof_bg.tsv"), show_col_types = FALSE)
+sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE)
+qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE)
+qual_pii <- read_tsv(file.path(cfg$data_path, "qual_pii.tsv"), show_col_types = FALSE)
+```
+
+# How many respondents took the survey?
+
+```{r}
+nrow(mc_complex)
+nrow(prof_bg)
+```
+
+The numbers above^ should match, and this represents the number of respondents.
+
+# How many institutions?
+
+I'm commenting out the relevant code for privacy reasons, but I first manually inspected the responses.
+```{r}
+# Keep commented for privacy!!
+# qual_pii$institution
+```
+
+Looking at the responses, I see several "categories" of institution: Network, networked university campus, independent university campus, and university-affiliated research center. "Networked" refers specifically to an OSPO network, not any other kind of network. Grouping the institutions by category, rather than listing them, will help protect respondent anonymity.
+
+I have manually cleaned up the responses (a lot of people listed their OSPO/department as well as their institution) and listed the responses, categories, and regions in data/manually_curated/orgs.tsv.
+
+```{r}
+# Do not preview in notebook, for privacy!!
+orgs <- read_tsv(
+  file.path(cfg$curated_path, "orgs.tsv"),
+  show_col_types = FALSE,
+  col_names = c("org", "cat", "region")
+)
+
+orgs <- orgs |>
+  count(across(all_of(c("org", "cat", "region"))), name = "cnt")
+
+# This is the number of unique institutions
+nrow(orgs)
+
+orgs <- orgs |>
+  arrange(desc(cnt))
+
+# Write to file (from utils.R)
+write_df_to_file(orgs, "orgs_summary.tsv", path_key = "curated_path")
+
+# Summary of org categories
+table(orgs$cat)
+```
+
+# Which regions are those institutions located in?
+
+```{r}
+table(orgs$region)
+```
+
+^The table above shows represented regions.
+
+Examining what people said for "other"
+
+```{r}
+# Keep commented for privacy!!
+# mc_other$region_other
+```
+
+# What roles do our respondents represent?
+
+```{r}
+role_label <- "role_mc"
+table(mc_complex[[role_label]])
+```
+
+Examining what people said for "other"
+
+```{r}
+# Keep commented for privacy!!
+# mc_other$role_other
+```
+
+What about job titles? Need to code these. Writing to a file for this purpose.
+```{r}
+write_df_to_file(qual$job, "job_titles.txt", path_key = "coding_path")
+```
+
+# What are our respondents' professional backgrounds?
+
+```{r}
+# Returns a list containing the frequency table for each column
+table_list <- lapply(prof_bg, table)
+
+# Examined the output by eye to make sure there's no weirdness
+# table_list
+
+# Extract the "Yes" count for each professional background
+# This was a SATA question so total != # of respondents
+yes_counts <- sapply(table_list, function(x) x["Yes"])
+yes_counts <- sort(yes_counts, decreasing = TRUE)
+print(yes_counts)
+```
+
+Examining the "other" responses. Mostly it looks like people just elaborating on the responses above, though one person said they were previously a volunteer to OS projects, which is interesting.
+
+```{r} 
+# Keep commented for privacy!!
+# sata_other$prof_bg_other
+```
