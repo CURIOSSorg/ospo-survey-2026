@@ -24,6 +24,14 @@ cfg <- config::get()
 mappings <- read_excel(file.path(cfg$data_path, "mappings.xlsx"), sheet = "mappings")
 ```
 
+# Prepare raw data
+After receiving the data from Clare, a password-protected .xlsx file, I copied the data into a new excel file without password protection so R's readxl package could read it. That file is in data/ and is called raw_data.xlsx.
+
+Right off the bat, I manually removed three non-empty but spurious rows:
+- Me! I didn't take the survey but I was clicking around in it.
+- Somebody who took the survey twice, I see
+- The very first response, which I suspect was a test by one of the survey organizers. The organization is listed as "dsad" and the email is "dsas", and the locations of those keys on a qwerty keyboard support my hypothesis that that was just some nonsense for a test run. The only question that that person answered was the "choose your top 3" drag-and-drop, so I assume an organizer was just testing that that question worked.
+
 # Import question name mappings
 The column headers in the raw data are too long to be tractable in a programmatic environment. They need short nicknames without special characters or spaces. Rather than hard-coding those nicknames into this script, I am putting them in another excel file, to make it easy for a survey administrator to copy-paste the original survey questions here.
 
@@ -143,7 +151,6 @@ get_name_map <- function(out_file, mapping_df) {
 ```
 
 # Read data from excel
-After receiving the data from Clare, a password-protected .xlsx file, I copied the data into a new excel file without password protection so R's readxl package could read it. That file is called raw_data.xlsx.
 
 ```{r}
 data <- readxl::read_excel("data/raw_data.xlsx", col_types = "text", na = c(""))
@@ -189,23 +196,10 @@ data <- remove_uninformative_rows(data)
 dim(data)
 ```
 
-Remove the very first response, which I suspect was a test by one of the survey organizers. The organization is listed as "dsad" and the email is "dsas", and the locations of those keys on a qwerty keyboard support my hypothesis that that was just some nonsense for a test run. The only question that that person answered was the "choose your top 3" drag-and-drop, so I assume an organizer was just testing that that question worked.
-
-```{r}
-data <- data |> slice(-1)
-```
-
 Remove HTML <p> tags that are present in some of the responses (presumably a bug from limesurvey).
 
 ```{r}
 data <- clean_p_tags(data)
-```
-
-Remove me! I was just clicking around to view the survey, I was not actually taking it.
-
-```{r}
-data <- data |>
-  filter(`Your email` != "virginiascarlett@ucsb.edu")
 ```
 
 # Write output files

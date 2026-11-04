@@ -30,12 +30,12 @@ cfg <- config::get()
 # Load data
 
 ```{r}
-mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE)
-mc_other <- read_tsv(file.path(cfg$data_path, "mc_other.tsv"), show_col_types = FALSE)
-prof_bg <- read_tsv(file.path(cfg$data_path, "prof_bg.tsv"), show_col_types = FALSE)
-sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE)
-qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE)
-qual_pii <- read_tsv(file.path(cfg$data_path, "qual_pii.tsv"), show_col_types = FALSE)
+mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+mc_other <- read_tsv(file.path(cfg$data_path, "mc_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+prof_bg <- read_tsv(file.path(cfg$data_path, "prof_bg.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+qual_pii <- read_tsv(file.path(cfg$data_path, "qual_pii.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 ```
 
 # How many respondents took the survey?
@@ -55,38 +55,39 @@ I'm commenting out the relevant code for privacy reasons, but I first manually i
 # qual_pii$institution
 ```
 
-Looking at the responses, I see several "categories" of institution: Network, networked university campus, independent university campus, and university-affiliated research center. "Networked" refers specifically to an OSPO network, not any other kind of network. Grouping the institutions by category, rather than listing them, will help protect respondent anonymity.
+Looking at the responses, I see several "categories" of institution: Network, networked university campus, independent university campus, and university-affiliated research center. "Networked" refers specifically to an OSPO network, not any other kind of network. Grouping the institutions by category, rather than listing them, in the final report will help protect respondent anonymity.
 
-I have manually cleaned up the responses (a lot of people listed their OSPO/department as well as their institution) and listed the responses, categories, and regions in data/manually_curated/orgs.tsv.
+I have manually cleaned up the responses and put them in a manually-curated excel file. The first sheet has two columns: the participant's response to the organization question and my standardized name for the org. The second sheet lists the category and region associated with that org.
 
 ```{r}
 # Do not preview in notebook, for privacy!!
-orgs <- read_tsv(
-  file.path(cfg$curated_path, "orgs.tsv"),
-  show_col_types = FALSE,
-  col_names = c("org", "cat", "region")
-)
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+org_info <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="org_info")
 
-orgs <- orgs |>
-  count(across(all_of(c("org", "cat", "region"))), name = "cnt")
+# Make sure the manually curated spreadsheet matches the survey data tsv
+identical(qual_pii$institution, org_responses$response)
 
 # This is the number of unique institutions
-nrow(orgs)
+length(unique(org_responses$organization))
+```
 
-orgs <- orgs |>
-  arrange(desc(cnt))
+```{r}
+merged <- left_join(org_responses, org_info, by = "organization")
 
-# Write to file (from utils.R)
-write_df_to_file(orgs, "orgs_summary.tsv", path_key = "curated_path")
+# Keeps the FIRST occurrence of each unique value in 'organization'
+# Use this df to look at the breakdown of institutions, where each
+# institution is counted only once.
+merged_unique <- merged |>
+  distinct(organization, .keep_all = TRUE)
 
-# Summary of org categories
-table(orgs$cat)
+# This is the breakdown of institutions by category
+table(merged_unique$category)
 ```
 
 # Which regions are those institutions located in?
 
 ```{r}
-table(orgs$region)
+table(merged_unique$region)
 ```
 
 ^The table above shows represented regions.
@@ -124,6 +125,7 @@ write_df_to_file(qual$job, "job_titles.txt", path_key = "coding_path")
 table_list <- lapply(prof_bg, table)
 
 # Examined the output by eye to make sure there's no weirdness
+# Keep commented for privacy
 # table_list
 
 # Extract the "Yes" count for each professional background
