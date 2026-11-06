@@ -32,6 +32,8 @@ cfg <- config::get()
 ```{r}
 mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 mc_other <- read_tsv(file.path(cfg$data_path, "mc_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+org_info <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="org_info")
 prof_bg <- read_tsv(file.path(cfg$data_path, "prof_bg.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
@@ -61,8 +63,6 @@ I have manually cleaned up the responses and put them in a manually-curated exce
 
 ```{r}
 # Do not preview in notebook, for privacy!!
-org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
-org_info <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="org_info")
 
 # Make sure the manually curated spreadsheet matches the survey data tsv
 identical(qual_pii$institution, org_responses$response)

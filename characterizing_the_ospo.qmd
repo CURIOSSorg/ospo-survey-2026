@@ -6,17 +6,194 @@ title: "Characterizing the academic OSPO in 2026"
 
 Here I am getting some background on the size and status of surveyed OSPOs.
 
-Research questions:\
+My research questions:\
 - Where are university OSPOs located within their university?\
 - How many of the organizations have an OSPO or dedicated OSPO staff? How many organizations just have staff doing OSPO-like work as part of another role?\
-- How old are the OSPOs?\
-- How big are the OSPOs?\
 - What fraction of OSPO contributors are volunteers?\
+- How old are the OSPOs?\
 
-Relevant survey questions:\
-- Which best describes the open source function at your organization?\
-- What is the open source enabling function called within your organization?\
-- Where is your OSPO located within your university?\
-- How long has your OSPO been operating?\
-- Roughly how much total staff time is formally spent on OSPO or OSPO-like activities in your organization?\
-- Beyond that, roughly how many people regularly spend time on OSPO activities without being formally resourced?\
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(docstring)
+library(readr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+
+# Load data
+```{r}
+ospo_loc <- read_tsv(file.path(cfg$data_path, "ospo_location.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+mc_other <- read_tsv(file.path(cfg$data_path, "mc_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+# Where are university OSPOs located within their university?
+
+```{r}
+# Need to do some data cleanup: filter so it's one response per institution,
+# Also remove answers that are purely from a network, not a single campus
+
+# To do this, I will keep only the FIRST occurrence of each unique value in 'organization'
+
+# Get a summary table of items and their first row index
+tmp <- org_responses |>
+  mutate(row_idx = row_number()) |>
+  group_by(organization) |>
+  summarise(first_occurrence_idx = min(row_idx), .groups = "drop")
+
+# Remove the UC OSPO Network
+tmp <- tmp[tmp$organization != "University of California OSPO Network", ]
+
+rows_to_keep <- sort(tmp$first_occurrence_idx)
+
+# Now we can look at results with one response per organization
+ospo_loc_filtered <- ospo_loc[rows_to_keep,]
+```
+
+```{r}
+# Extract the "Yes" count for each ospo location
+# This was a SATA question so total != # of institutions
+table_list <- lapply(ospo_loc_filtered, table)
+yes_counts <- sapply(table_list, function(x) x["Yes"])
+yes_counts <- sort(yes_counts, decreasing = TRUE)
+print(yes_counts)
+sum(yes_counts)
+```
+
+The number of "yes" responses is substantially higher than the number of institutions (37 locations for 26 orgs). That's higher than I would expect from only 2 institutions where the OSPO is jointly hosted.
+
+```{r}
+num_yes_per_row <- rowSums(ospo_loc_filtered=="Yes")
+sum(num_yes_per_row > 1)
+```
+
+While only 2 respondents selected "joint", 5 respondents selected more than one home for their OSPO. One selected library, tto, hpc, research center, AND joint!
+
+How many OSPOs have neither a TTO nor library connection?
+
+```{r}
+sum(ospo_loc_filtered$library == "No" & ospo_loc_filtered$tto == "No")
+```
+
+# How many of the organizations have an OSPO or dedicated OSPO staff?
+
+```{r}
+mc_comp_filtered <- mc_complex[rows_to_keep,]
+mc_other_filtered <- mc_other[rows_to_keep,]
+table(mc_comp_filtered$function_mc)
+
+# Keep commented for privacy!!
+# mc_other_filtered$function_other[!is.na(mc_other_filtered$function_other)]
+
+```
+
+I see that one person who selected "other" wasn't sure if they should respond on behalf of their campus or their OSPO Network. I'm going to say they should answer on behalf of the campus, which adds +1 to the "OSPO-like activities without a formal office" category. The two other people who said "other" both wrote in "TTO", so I would argue that those should really be "OSPO-like activities without a formal office" as well. 
+
+## Staff time
+
+```{r}
+mc_simp_filtered <- mc_simple[rows_to_keep,]
+time_counts <- table(mc_simp_filtered$staff_time)
+desired_order <- c("Less than 0.5 FTE", "Between 0.5 and 1 FTE", "1 to 2 FTE", "2 to 5 FTE", "I don't know", "More than 5 FTE")
+time_counts <- time_counts[desired_order]
+time_counts
+```
+
+About half of OSPOs have less than 1 FTE. Most OSPOs (>80%) have 2 FTE or less.
+
+Quick aside: Two people said "I don't know" for staff time commitment. Let's see if anyone else from their org gave a more informative answer.
+
+```{r}
+counted_orgs <- org_responses[rows_to_keep,]
+idk_rows <- which(mc_simp_filtered$staff_time=="I don't know")
+
+# Keep commented for privacy!!
+# counted_orgs[idk_rows,]
+```
+
+Our sample size is small enough that I can just take a look and see that both of these "I don't know" answers came from institutions that had only one response, so there are no second opinions here.
+
+I suspect that the "OSPOs" with several FTE may actually be TTOs where everybody does OSPO stuff. Let's do an eyeball check to see if the data support this.
+
+```{r}
+combined <- cbind(ospo_loc_filtered, mc_comp_filtered$function_mc, mc_simp_filtered$staff_time)
+names(combined)[ncol(combined) - 1] <- "function_mc"
+names(combined)[ncol(combined)] <- "staff_time"
+
+# Check that the data frame does not look weird
+head(combined)
+```
+
+```{r}
+# FTE size vs level of establishment
+table_establishment <- table(combined$staff_time, combined$function_mc)
+print(table_establishment)
+```
+
+Eyeballing suggests that the established OSPOs have 0.5-5 FTE, while emerging OSPOs are most likely to have less than 0.5 FTE. OSPO-like activities without a formal office run the gamut from well-staffed to poorly staffed.
+
+```{r}
+# FTE size vs. TTO status
+table_tto <- table(combined$staff_time, combined$tto)
+print(table_tto)
+```
+
+Meh, maybe the TTO hypothesis is not that interesting. It looks like the responses are pretty diverse, though Between 0.5 and 1 FTE is most common.
+
+## Basic statistics
+
+```{r}
+# Fisher's exact test: are FTE size and establishment related?
+fisher.test(table(combined$staff_time, combined$function_mc), simulate.p.value = TRUE)
+```
+
+Suggests the trend between staff time and OSPO establishment is not significant. Let's also run a Wilcoxon test, not to p-hack, but just to view the data from another perspective. Wilcoxon is a non-parametric test for a difference between medians of two groups.
+
+```{r}
+# Convert categories to their numerical midpoint
+fte_numeric <- ifelse(combined$staff_time == "Less than 0.5 FTE", 0.25,
+                  ifelse(combined$staff_time == "Between 0.5 and 1 FTE", 0.75,
+                  ifelse(combined$staff_time == "1 to 2 FTE", 1.5,
+                  ifelse(combined$staff_time == "2 to 5 FTE", 3.5, NA))))
+
+comb_fte_numeric <- cbind(combined, fte_numeric)
+
+# Test if established OSPOs have a different median FTE 
+# Create a simple Yes/No for formal establishment
+comb_fte_numeric$is_formal <- ifelse(comb_fte_numeric$function_mc == "A formally established OSPO", "Yes", "No")
+
+fte_vs_establishment <- comb_fte_numeric[, c("fte_numeric", "is_formal")]
+head(fte_vs_establishment)
+```
+
+
+```{r}
+wilcox.test(fte_numeric ~ is_formal, data = fte_vs_establishment)
+```
+
+Well, this test says the medians are significantly different. So all together, we have some weak evidence suggesting there might be a trend.
+
+# Volunteer time
+
+```{r}
+table(mc_simp_filtered$volunteers)
+```
+
+# OSPO age
+
+```{r}
+age_counts <- table(mc_simp_filtered$age)
+desired_order <- c("Less than 1 year", "1 to 2 years", "3 to 5 years", "More than 5 years")
+age_counts <- age_counts[desired_order]
+age_counts
+```
