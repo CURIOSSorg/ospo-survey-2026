@@ -8,6 +8,7 @@ Here I am getting some background on the size and status of surveyed OSPOs.
 
 My research questions:\
 - Where are university OSPOs located within their university?\
+- What are the OSPOs called?
 - How many of the organizations have an OSPO or dedicated OSPO staff? How many organizations just have staff doing OSPO-like work as part of another role?\
 - What fraction of OSPO contributors are volunteers?\
 - How old are the OSPOs?\
@@ -31,6 +32,7 @@ cfg <- config::get()
 ```{r}
 ospo_loc <- read_tsv(file.path(cfg$data_path, "ospo_location.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
 mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 mc_other <- read_tsv(file.path(cfg$data_path, "mc_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
@@ -84,6 +86,14 @@ How many OSPOs have neither a TTO nor library connection?
 ```{r}
 sum(ospo_loc_filtered$library == "No" & ospo_loc_filtered$tto == "No")
 ```
+
+# What are the OSPOs called?
+Export to a new file for qualitative coding analysis. Again, let's filter out duplicates so we just have one response per institution.
+```{r}
+qual_filt <- qual[rows_to_keep,]
+write_df_to_file(qual_filt$ospo_function, "ospo_names.txt", path_key = "coding_path")
+```
+
 
 # How many of the organizations have an OSPO or dedicated OSPO staff?
 
