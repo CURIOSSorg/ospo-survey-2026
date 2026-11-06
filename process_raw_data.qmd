@@ -57,21 +57,6 @@ The mappings file must be called `mappings.xlsx`. It has a single sheet named `m
 # Define functions
 
 ```{r}
-remove_uninformative_rows <- function(df) {
-  #' Remove Uninformative Rows
-  #' 
-  #' Removes rows that contain either an NA object, an empty string, or a
-  #' whitespace string ("  ") in every column.
-  #' 
-  #' @param df Data frame to process.
-  #' @return A copy of the data frame with uninformative rows removed.
-  df |>
-    filter(if_any(everything(), function(x) {
-      val <- trimws(x) # trim whitespace
-      !is.na(val) & val != ""
-    }))
-}
-
 clean_p_tags <- function(df) {
   #' Clean HTML P Tags from Data Frame Entries
   #'

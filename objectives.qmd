@@ -1,0 +1,137 @@
+---
+title: "What are OSPOs trying to achieve?"
+---
+
+# Overview
+
+Title says it all, really.
+
+Research questions:
+- Who does your OSPO primarily serve?\
+- What are the main objectives of your OSPO or OSPO-like function?\
+- Does your OSPO currently track any metrics or indicators of its impact?\
+- What is your elevator pitch for why your OSPO matters?\
+
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(docstring)
+library(readr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+
+# Load data
+```{r}
+mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+objs <- read_tsv(file.path(cfg$data_path, "objectives.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+# Scope/audience
+Hopefully responses from the same institution match, but let's check. 
+```{r}
+org_responses$scope <- mc_simple$scope
+dupes <- org_responses |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  ungroup()
+
+# Keep commented for privacy!!
+# dupes
+```
+
+Okay, well, there is one disagreement, but I know that university, and they're not part of an OSPO Network, so I'm pretty inclined to side with respondent 1 over respondent 2 on this and say they serve their own institution, and no other institutions. I think the intent of the "beyond our institution" thing was really about official services like OSPO networks. And the question says who do you "primarily" serve.
+
+Since the person I agree with happens to occur first, I can just do what I did in the last notebook: grab the first occurrence of the institution. I think I will leave in the one Network-level response this time, because I think it's relevant here.
+
+```{r}
+# We don't need this column
+org_responses <- org_responses %>% select(-response)
+
+# Get a summary table of items and their first row index
+tmp <- org_responses |>
+  mutate(row_idx = row_number()) |>
+  group_by(organization) |>
+  summarise(first_occurrence_idx = min(row_idx), .groups = "drop")
+
+rows_to_keep <- sort(tmp$first_occurrence_idx)
+
+# One response per org
+org_responses_filt <- org_responses[rows_to_keep,]
+```
+
+```{r}
+table(org_responses_filt$scope)
+```
+
+# Objectives
+
+This was a matrix question. I'll start by recoding the likert scale responses to numbers.
+
+```{r}
+score_map <- c(
+  "Not an objective for us"  = 0L,
+  "A minor consideration"   = 1L,
+  "Important, but secondary" = 2L,
+  "A core objective"        = 3L
+)
+
+# Convert all text columns to numeric values
+objs_numeric <- objs |>
+  mutate(across(everything(), ~ score_map[.x]))
+```
+
+I strongly suspect that there will be differences between responses from the same institution. Let's check.
+
+```{r}
+org_objs <- cbind(org_responses$organization, objs_numeric)
+names(org_objs)[1] <- "org"
+dupes2 <- org_objs |>
+  group_by(org) |>
+  filter(n() > 1) |>
+  arrange(org, .by_group = TRUE)
+
+# Keep commented for privacy!!
+# dupes2
+```
+
+As expected, responses from the same institution do not match perfectly. However, they are pretty similar (which is good!). I'm going to take an average from the orgs that had multiple responses, and I'll use that to calculate the institution's score. 
+
+```{r}
+# Uh-oh, I'm getting NAs. Which rows have NAs?
+which(is.na(objs_numeric), arr.ind = TRUE)
+```
+
+I see one person gave all NA responses to this question. I will remove them.
+
+```{r}
+# N.B. this removes rows with NA in ANY column
+dim(org_objs)
+org_objs <- na.omit(org_objs)
+dim(org_objs)
+```
+
+I'm just going to take the average score per organization.
+
+```{r}
+org_objs_avgd <- org_objs %>%
+  group_by(org) %>%
+  summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))
+
+dim(org_objs_avgd)
+# Keep commented for privacy!!
+# org_objs_avgd
+```
+
+Check out the overall scores for each objective
+```{r}
+sort(colSums(org_objs_avgd[,-1]), decreasing = TRUE)
+```
