@@ -1,0 +1,35 @@
+---
+title: "Tools"
+---
+
+# Overview
+
+Questions related to tool use.
+
+Research questions:
+- How are OSPOs contributing to the org's open source tooling and infrastructure?
+- How are OSPOs engaging with AI, as advisors?
+- How are OSPOs engaging with AI, as users?
+- What tools do OSPOs rely on?
+- Is available tooling a limitation for OSPOs?
+
+Survey questions:
+- Supporting tools and infrastructure (from the activity checklist)
+- Which AI-related topics or services has your OSPO worked on?
+- How does your OSPO use AI tools in its own work?
+- Which of the following does your OSPO rely on in its day-to-day work? TODO!! ADD TO MAPPINGS FILE
+
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(docstring)
+library(readr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
