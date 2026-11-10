@@ -1,0 +1,171 @@
+---
+title: "Activities"
+---
+
+# Overview
+
+Analyzing questions related to OSPO activities and services.
+
+Research questions:\
+- What services do OSPOs most commonly offer?\
+- How do OSPOs spend the bulk of their time?\
+
+Survey questions:\
+- Tick the activities your OSPO actually carries out today:\
+  - Developing and sharing best practices (best_practices)\
+  - Educational efforts (edu_efforts)\
+  - External partnerships and tech transfer (ext_partnerships)\
+  - [Supporting tools and infrastructure (tools_infra) - not analyzed here, see tools notebook]\
+  - Community building (comm_building)\
+  - Directly supporting open source projects (project_support)\
+  - Advocacy and policy (advocacy_policy)\
+  - Funding and financial support (funding_support)\
+  - OSPO operations (ospo_ops)\
+- Of the activities above, which take the most of your own time? Rank your top three. (ranking)\
+
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(tibble)
+library(docstring)
+library(readr)
+library(tidyr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+# Load data
+```{r}
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
+best_practices <- read_tsv(file.path(cfg$data_path, "best_practices.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+edu_efforts <- read_tsv(file.path(cfg$data_path, "edu_efforts.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ext_partnerships <- read_tsv(file.path(cfg$data_path, "ext_partnerships.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+tools_infra <- read_tsv(file.path(cfg$data_path, "tools_infra.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+comm_building <- read_tsv(file.path(cfg$data_path, "comm_building.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+project_support <- read_tsv(file.path(cfg$data_path, "project_support.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+advocacy_policy <- read_tsv(file.path(cfg$data_path, "advocacy_policy.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+funding_support <- read_tsv(file.path(cfg$data_path, "funding_support.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ospo_ops <- read_tsv(file.path(cfg$data_path, "ospo_ops.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ranking <- read_tsv(file.path(cfg$data_path, "ranking.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+# What services do OSPOs most commonly offer?
+
+```{r}
+best_practices$organization <- org_responses$organization
+bp_consolidated <- consolidate_org_responses_yn(best_practices)
+bp <- count_yes_responses(bp_consolidated)
+bp
+```
+
+```{r}
+edu_efforts$organization <- org_responses$organization
+edu_consolidated <- consolidate_org_responses_yn(edu_efforts)
+edu <- count_yes_responses(edu_consolidated)
+edu
+```
+
+```{r}
+ext_partnerships$organization <- org_responses$organization
+ext_consolidated <- consolidate_org_responses_yn(ext_partnerships)
+ext <- count_yes_responses(ext_consolidated)
+ext
+```
+
+```{r}
+tools_infra$organization <- org_responses$organization
+tools_consolidated <- consolidate_org_responses_yn(tools_infra)
+tools <- count_yes_responses(tools_consolidated)
+tools
+```
+
+```{r}
+comm_building$organization <- org_responses$organization
+cb_consolidated <- consolidate_org_responses_yn(comm_building)
+cb <- count_yes_responses(cb_consolidated)
+cb
+```
+
+```{r}
+project_support$organization <- org_responses$organization
+ps_consolidated <- consolidate_org_responses_yn(project_support)
+ps <- count_yes_responses(ps_consolidated)
+ps
+```
+
+```{r}
+advocacy_policy$organization <- org_responses$organization
+ap_consolidated <- consolidate_org_responses_yn(advocacy_policy)
+ap <- count_yes_responses(ap_consolidated)
+ap
+```
+
+```{r}
+funding_support$organization <- org_responses$organization
+fs_consolidated <- consolidate_org_responses_yn(funding_support)
+fs <- count_yes_responses(fs_consolidated)
+fs
+```
+
+```{r}
+ospo_ops$organization <- org_responses$organization
+ospo_consolidated <- consolidate_org_responses_yn(ospo_ops)
+ospo <- count_yes_responses(ospo_consolidated)
+ospo
+```
+
+Let's look at the upper quartile of activities, sorted by how widespread they are among OSPOs.
+
+```{r}
+mega_df <- rbind(bp, edu, ext, tools, cb, ps, ap, fs, ospo)
+top_quartile <- mega_df |>
+  filter(count >= quantile(count, 0.75)) |>
+  arrange(desc(count))
+top_quartile
+```
+
+Maybe it would be interesting to look at the least widespread activities as well.
+
+```{r}
+mega_df |> filter(count <= quantile(count, 0.25)) |> arrange(count)
+```
+
+That is pretty interesting! OSPOs are too poor for these activities lol.
+
+# Which activities take the most time?
+
+Let's say that every time an activity is ranked #1, it gets 3 points, when it's ranked #2, it gets 2 point, and when it's ranked #3, it gets 1 point.
+
+I think in this case I will not filter to one response per organization, since the survey said, "Answer for yourself, not the whole team." So we can interpret this as, how OSPO workers spend their time.
+
+```{r}
+activity_scores <- ranking |>
+  pivot_longer(
+    cols = c(rank1, rank2, rank3),
+    names_to = "rank",
+    values_to = "activity"
+  ) |>
+  mutate(
+    points = case_when(
+      rank == "rank1" ~ 3,
+      rank == "rank2" ~ 2,
+      rank == "rank3" ~ 1
+    )
+  ) |>
+  group_by(activity) |>
+  summarise(total_score = sum(points), .groups = "drop") |>
+  arrange(desc(total_score))
+
+activity_scores
+```
+
+Note: from manual inspection I see that one person did not answer this question. That's where the NAs come from.
+
+Note: I manually reviewed the "other" answers and didn't see anything super compelling. I did add a couple of "lessons learned" based on answers that people wrote in and that I think should be survey options next time.

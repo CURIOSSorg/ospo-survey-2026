@@ -126,13 +126,7 @@ count_yes_responses <- function(data, yes_val = "Yes", no_val = "No") {
   #'   `yes_val` to identify valid binary columns. Default is `"No"`.
   #'
   #' @return A tibble with three columns: count, tip, nickname
-  #'
-  #' @examples
-  #' \dontrun{
-  #' results <- count_yes_responses(tools_infra)
-  #' print(results$counts)
-  #' print(results$total)
-  #' }
+
   # Keep only columns where every entry is either yes_val or no_val
   is_yn_col <- sapply(data, function(col) all(col %in% c(yes_val, no_val)))
   yn_data <- data[, is_yn_col, drop = FALSE]

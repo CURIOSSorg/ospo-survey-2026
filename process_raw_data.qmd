@@ -8,6 +8,8 @@ This notebook describes my tidying of the raw data from the fall 2026 CURIOSS OS
 
 These data could go in a relational database, but why overcomplicate things? tsv files will do the job.
 
+N.B.: I already did a tiny bit of manual clean-up by removing three artifactual rows: one was from me when I was just clicking around, not actually taking the survey, one was from a respondent who started the survey, didn't finish, then came back and completed the whole thing from scratch (I deleted their first attempt), and the first row, which only had real data for the ranking question. I suspect this was a survey administrator making sure that that question worked.
+
 # Import packages, utilities, and config variables
 ```{r}
 library(readxl)
