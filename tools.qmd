@@ -4,28 +4,30 @@ title: "Tools"
 
 # Overview
 
-Questions related to tool use.
+Analyzing questions related to tool use.
 
 Research questions:
-- How are OSPOs contributing to the org's open source tooling and infrastructure?
+- How are OSPOs contributing to their org's open source tooling and infrastructure?
 - How are OSPOs engaging with AI, as advisors?
 - How are OSPOs engaging with AI, as users?
 - What tools do OSPOs rely on?
 - Is available tooling a limitation for OSPOs?
 
 Survey questions:
-- Supporting tools and infrastructure (from the activity checklist)
-- Which AI-related topics or services has your OSPO worked on?
-- How does your OSPO use AI tools in its own work?
-- Which of the following does your OSPO rely on in its day-to-day work? TODO!! ADD TO MAPPINGS FILE
+- Supporting tools and infrastructure (tools_infra)
+- Which AI-related topics or services has your OSPO worked on? (ai_topics)
+- How does your OSPO use AI tools in its own work? (ai_usage)
+- Which of the following does your OSPO rely on in its day-to-day work? (tools_reliance)
 
 
 # Import packages, utilities, and config variables
 ```{r}
 library(readxl)
 library(dplyr)
+library(tibble)
 library(docstring)
 library(readr)
+library(tidyr)
 
 source("utils.R")
 
@@ -33,3 +35,115 @@ source("utils.R")
 cfg <- config::get()
 ```
 
+# Load data
+```{r}
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
+tools_infra <- read_tsv(file.path(cfg$data_path, "tools_infra.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ai_topics <- read_tsv(file.path(cfg$data_path, "ai_topics.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ai_usage <- read_tsv(file.path(cfg$data_path, "ai_usage.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+tools_reliance <- read_tsv(file.path(cfg$data_path, "tools_reliance.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+blockers <- read_tsv(file.path(cfg$data_path, "blockers.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+# How are OSPOs contributing to their org's open source tooling and infrastructure?
+
+First we need to, once again, filter responses to one response per OSPO.
+
+```{r}
+tools_infra$organization <- org_responses$organization
+
+dupes <- tools_infra |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  arrange(organization, .by_group = TRUE)
+
+# Keep commented for privacy!!
+# dupes
+```
+
+UGH this is super annoying. There is substantial disagreement. For example, when asked whether they provide or manage code hosting, every single organization that gave >1 response had disagreement among the responses. So I have some options for how to proceed:\
+1) Choose one respondent at random.\
+2) Choose one respondent at random, and then run several versions of the analysis with different randomly selected "respresentatives", and see how much the final results change among the different combinations.\
+3) Select "yes" as the institution's answer if ANYBODY from that institution said "yes".
+
+Obviously it's very imperfect, but I'm going to go with #3. It seems more robust/justifiable than #1, and I don't really have time to do #2. I've added a function to utils.R to consolidate the df for these SATA questions according to the heuristic in #3.
+
+```{r}
+tools_infra_consolidated <- consolidate_org_responses_yn(tools_infra)
+```
+
+I've looked at the results manually and the function seems to work as it should.
+
+Okay, so now we can actually proceed to actually draw some conclusions from the data.
+
+```{r}
+count_yes_responses(tools_infra_consolidated)
+```
+
+So it looks like the most common ways that OSPOs contribute to their organization's tooling/infrastructure for open source are through software catalogs and code hosting. Building EdTech software is the least common.
+
+# How are OSPOs engaging with AI, as advisors?
+
+```{r}
+ai_topics$organization <- org_responses$organization
+ai_topics_consolidated <- consolidate_org_responses_yn(ai_topics)
+count_yes_responses(ai_topics_consolidated)
+```
+
+So it looks like the most common answer is "Contributing to institutional or sector AI policy discussions". Other popular answers include "Running training or awareness sessions on AI and open source", "Supporting the open release of models, weights, or training datasets", and "Helping researchers evaluate or adopt open source AI tools". "Developing institutional guidance on the use of AI coding assistants" was the least common response.
+
+# How are OSPOs engaging with AI, as users?
+
+```{r}
+ai_usage$organization <- org_responses$organization
+ai_usage_consolidated <- consolidate_org_responses_yn(ai_usage)
+count_yes_responses(ai_usage_consolidated)
+```
+
+# What tools do OSPOs rely on?
+
+```{r}
+tools_reliance$organization <- org_responses$organization
+tools_reliance_consolidated <- consolidate_org_responses_yn(tools_reliance)
+count_yes_responses(tools_reliance_consolidated)
+```
+
+# Is tooling a blocker for OSPOs?
+
+```{r}
+score_map <- c(
+  "Not a blocker for us"  = 0L,
+  "Minor, we work around it"   = 1L,
+  "Moderate, it slows us down" = 2L,
+  "Major, it limits our impact"        = 3L
+)
+
+# Convert all text columns to numeric values
+blockers_numeric <- blockers |>
+  mutate(across(everything(), ~ score_map[.x]))
+
+blockers_numeric$organization <- org_responses$organization
+blockers_numeric_consolidated <- consolidate_org_responses_num(blockers_numeric)
+```
+
+```{r}
+tally_matrix_vals_by_org(blockers_numeric_consolidated)
+```
+
+# Write-in responses.
+
+Finally, let's look at the comments people wrote in regarding tools. If I judge that we are getting some interesting content from a particular question, I may write it to its own file for analysis in QualCoder.
+
+```{r}
+# Keep commented for privacy!!
+
+# sata_other$tools_infra_other
+# sata_other$tools_other
+# sata_other$ai_topics_other
+# sata_other$ai_use_other
+```
+
+Meh, I don't see anything super compelling here.

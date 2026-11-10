@@ -19,9 +19,6 @@ source("utils.R")
 
 # Read config.yml
 cfg <- config::get()
-
-# Read the external mappings file
-mappings <- read_excel(file.path(cfg$data_path, "mappings.xlsx"), sheet = "mappings")
 ```
 
 # Prepare raw data
@@ -32,10 +29,8 @@ Right off the bat, I manually removed three non-empty but spurious rows:
 - Somebody who took the survey twice, I see
 - The very first response, which I suspect was a test by one of the survey organizers. The organization is listed as "dsad" and the email is "dsas", and the locations of those keys on a qwerty keyboard support my hypothesis that that was just some nonsense for a test run. The only question that that person answered was the "choose your top 3" drag-and-drop, so I assume an organizer was just testing that that question worked.
 
-# Import question name mappings
-The column headers in the raw data are too long to be tractable in a programmatic environment. They need short nicknames without special characters or spaces. Rather than hard-coding those nicknames into this script, I am putting them in another excel file, to make it easy for a survey administrator to copy-paste the original survey questions here.
-
-The mappings file must be called `mappings.xlsx`. It has a single sheet named `mappings` with five columns: `nickname`, `root`, `tip`, `output_file`, and `category`.
+# Import codebook
+The column headers in the raw data are too long to be tractable in a programmatic environment. They need short nicknames without special characters or spaces. Rather than hard-coding those nicknames into this script, I am putting them in another excel file. That file must be called `codebook.xlsx`. It has a single sheet with six columns: `nickname`, `root`,	`tip`,	`output_file`,	and `category`.
 
 `nickname` is a short, unique, machine-friendly name for the column (no spaces or special characters).
 
@@ -53,6 +48,10 @@ The mappings file must be called `mappings.xlsx`. It has a single sheet named `m
 `matrix`: matrix questions.\
 `ranking`: drag-and-drop ranking questions (e.g. choose your top three).\
 `sata`: select-all-that-apply questions.
+
+```{r}
+codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
+```
 
 # Define functions
 
@@ -115,19 +114,19 @@ reconstruct_original_name <- function(root, tip) {
   paste0(root, " [", tip, "]")
 }
 
-get_name_map <- function(out_file, mapping_df) {
+get_name_map <- function(out_file, codebook_df) {
   #' Generate a Named Vector of Column Mappings for an Output File
   #'
   #' @description
-  #' Filters the mappings table to rows with the given output_file, reconstructs
+  #' Filters the codebook to rows with the given output_file, reconstructs
   #' the original survey column name from root and tip, and returns a named
   #' vector of the form c(nickname = original_name) suitable for use with
   #' select_and_rename().
   #'
   #' @param out_file   Character string matching the 'output_file' column.
-  #' @param mapping_df The mappings data frame.
+  #' @param codebook_df The codebook data frame.
   #' @return A named character vector.
-  subset_df <- mapping_df |>
+  subset_df <- codebook_df |>
     filter(output_file == out_file) |>
     mutate(original_name = mapply(reconstruct_original_name, root, tip))
 
@@ -189,13 +188,13 @@ data <- clean_p_tags(data)
 
 # Write output files
 
-Each row in the mappings table specifies which output file a survey column belongs to. The loop below iterates over each distinct `output_file` value, extracts the corresponding columns from the data, and writes them to a TSV file. The order of output files follows their first appearance in the mappings table.
+Each row in the codebook table specifies which output file a survey column belongs to. The loop below iterates over each distinct `output_file` value, extracts the corresponding columns from the data, and writes them to a TSV file. The order of output files follows their first appearance in the mappings table.
 
 ```{r}
-output_files <- unique(mappings$output_file)
+output_files <- unique(codebook$output_file)
 
 for (out_file in output_files) {
-  name_map <- get_name_map(out_file, mappings)
+  name_map <- get_name_map(out_file, codebook)
   df <- select_and_rename(data, name_map)
   write_df_to_file(df, paste0(out_file, ".tsv"))
 }
