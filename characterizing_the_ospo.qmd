@@ -207,3 +207,16 @@ desired_order <- c("Less than 1 year", "1 to 2 years", "3 to 5 years", "More tha
 age_counts <- age_counts[desired_order]
 age_counts
 ```
+
+Try to get a ballpark average age.
+
+```{r}
+midpoint_lookup <- c(
+  "Less than 1 year" = 0.5,
+  "1 to 2 years"      = 1.5,
+  "3 to 5 years"      = 4.0,
+  "More than 5 years" = 5.5 # arbitrarily chosen
+)
+age_midpoints <- unname(midpoint_lookup[mc_simp_filtered$age])
+mean(age_midpoints, na.rm = TRUE)
+```

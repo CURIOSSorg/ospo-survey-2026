@@ -33,10 +33,11 @@ mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types 
 org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
 objs <- read_tsv(file.path(cfg$data_path, "objectives.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 ```
 
 # Scope/audience
-Hopefully responses from the same institution match, but let's check. 
+What is each OSPO's scope/audience? Hopefully responses from the same institution match, but let's check. 
 ```{r}
 org_responses$scope <- mc_simple$scope
 dupes <- org_responses |>
@@ -54,7 +55,7 @@ Since the person I agree with happens to occur first, I can just do what I did i
 
 ```{r}
 # We don't need this column
-org_responses <- org_responses %>% select(-response)
+org_responses <- org_responses |> select(-response)
 
 # Get a summary table of items and their first row index
 tmp <- org_responses |>
@@ -65,7 +66,7 @@ tmp <- org_responses |>
 rows_to_keep <- sort(tmp$first_occurrence_idx)
 
 # One response per org
-org_responses_filt <- org_responses[rows_to_keep,]
+org_responses_filt <- org_responses[rows_to_keep, ]
 ```
 
 ```{r}
@@ -122,8 +123,8 @@ dim(org_objs)
 I'm just going to take the average score per organization.
 
 ```{r}
-org_objs_avgd <- org_objs %>%
-  group_by(org) %>%
+org_objs_avgd <- org_objs |>
+  group_by(org) |>
   summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))
 
 dim(org_objs_avgd)
@@ -134,4 +135,45 @@ dim(org_objs_avgd)
 Check out the overall scores for each objective
 ```{r}
 sort(colSums(org_objs_avgd[,-1]), decreasing = TRUE)
+```
+
+# Metrics
+This was a slightly sneaky "simple multiple choice" question in that it doesn't use an "other" field, but it was followed by a very closely related qualitative question. Let's save those qualitative answers to a file for coding. Note that for this one we are NOT filtering to one response per institution.
+
+```{r}
+write_df_to_file(qual$metrics_other, "metrics.txt", path_key = "coding_path")
+```
+
+As before, let's inspect the responses from the same university and see if they are in accord with one another.
+
+```{r}
+org_metrics <- org_responses
+org_metrics$metrics <- mc_simple$metrics
+# We don't need this column
+org_metrics <- org_metrics |> select(-scope)
+dupes <- org_metrics |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  arrange(metrics, .by_group = TRUE)
+
+# Keep commented for privacy!!
+# dupes
+```
+
+Bah! They mostly agree, but there is one institution where the respondents disagree (2 responses total). I'm just going to pick one at random. I'll just pick whichever response comes first.
+
+```{r}
+# One response per org
+org_metrics_filt <- org_metrics[rows_to_keep, ]
+```
+
+```{r}
+table(org_metrics_filt$metrics)
+```
+
+# Pitch
+Sending the question about the OSPO's elevator pitch straight to file for qualitative coding.
+
+```{r}
+write_df_to_file(qual$pitch, "pitch.txt", path_key = "coding_path")
 ```
