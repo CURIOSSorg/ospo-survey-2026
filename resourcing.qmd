@@ -1,0 +1,92 @@
+---
+title: "Resourcing"
+---
+
+# Overview
+
+Analyzing questions related to funding and constraints.
+
+Research questions:\
+- How are OSPOs funded?\
+- What fraction of OSPO contributors are volunteers?\
+- What are the OSPOs' biggest blockers?\
+
+Relevant survey questions:\
+- How are your OSPO activities funded or allocated?\
+- Roughly how many people regularly spend time on OSPO activities without being formally resourced?\
+- Which of the following blockers has your OSPO encountered?\
+
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(tibble)
+library(docstring)
+library(readr)
+library(tidyr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+# Load data
+```{r}
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
+mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+
+tools_infra <- read_tsv(file.path(cfg$data_path, "tools_infra.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ai_topics <- read_tsv(file.path(cfg$data_path, "ai_topics.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ai_usage <- read_tsv(file.path(cfg$data_path, "ai_usage.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+tools_reliance <- read_tsv(file.path(cfg$data_path, "tools_reliance.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+blockers <- read_tsv(file.path(cfg$data_path, "blockers.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+
+
+
+# What fraction of OSPO contributors are volunteers?
+
+First, inspect answers from each org and check for disagreement from within the same org.
+```{r}
+mc_simple$organization <- org_responses$organization
+volunteers <- mc_simple |>
+    select(volunteers, organization)
+
+dupes <- volunteers |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  arrange(organization, .by_group = TRUE) |>
+  select(volunteers, organization)
+
+# Keep commented for privacy!!
+# dupes
+```
+
+Okay, great. I can see that only at one university did all respondents give a consistent answer. Similar to what I did in the "tools" notebook, I am going to just take the largest of the answers, because I expect that people are more likely to underestimate than overestimate on this one.
+
+```{r}
+# Order of preference: keep whichever is further down the list
+ordered_sizes <- c(
+    "I don't know",
+    "None",
+    "1 person",
+    "2 to 5 people",
+    "6-10 people"
+)
+
+volunteers_consolidated <- volunteers |>
+  mutate(volunteers = factor(volunteers, levels = ordered_sizes)) |>
+  group_by(organization) |>
+  slice_max(volunteers, n = 1, with_ties = FALSE) |>
+  ungroup() |>
+  mutate(volunteers = as.character(volunteers))
+
+
+volunteers_consolidated |> count(volunteers)
+```
