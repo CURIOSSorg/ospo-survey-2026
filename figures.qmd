@@ -1,0 +1,167 @@
+---
+title: "Figures"
+---
+
+# Overview
+
+Since this is a relatively small project with relatively simple figures, I'll try just making all the figures in one notebook from hard-coded numbers, and we'll see how that goes.
+
+# Bar chart
+```{r}
+library(ggplot2)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+```{r}
+df <- data.frame(
+  category = c(
+    "Tech Transfer",
+    "Library",
+    "Administration",
+    "An academic dept",
+    "An RSE group",
+    "A research center",
+    "An AI institute",
+    "An HPC center"
+  ),
+  value = c(8, 7, 5, 4, 3, 3, 3, 2)
+)
+df <- df[order(-df$value), ]
+df$category <- factor(df$category, levels = unique(df$category))
+```
+
+```{r}
+# Custom hex palette
+# custom_colors <- c(
+#   "#00817f",
+#   "#42F2FF",
+#   "#B92DA4",
+#   "#F7D00B",
+#   "#124B5C",
+#   "#6A1B70",
+#   "#F27405",
+#   "#D9A00E"
+# )
+
+
+ggplot(df, aes(x = category, y = value)) +
+  geom_col(width = 0.6, fill = "#39a695") +
+  scale_fill_manual(values = "#39a695") +
+  # Anchor bars flush to the x-axis with 10% headroom at the top
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "OSPO locations",
+    x = NULL,
+    y = "Number of OSPOs"
+  ) +
+
+theme(
+    # Canvas backgrounds
+    plot.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.background = element_rect(fill = "#FFFFFF", color = NA),
+    
+    # Subtle horizontal gridlines only
+    panel.grid.major.y = element_line(color = "#E5E7EB", linewidth = 0.5),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    
+    # Clean baseline axis without tick marks
+    axis.line.x = element_line(color = "#374151", linewidth = 0.6),
+    axis.line.y = element_blank(),
+    axis.ticks = element_blank(),
+    
+    # Typography and spacing
+    plot.margin = margin(t = 20, r = 20, b = 15, l = 15),
+    plot.title = element_text(color = "#111827", size = 14, face = "bold", margin = margin(b = 15)),
+    axis.title.y = element_text(color = "#374151", size = 11, margin = margin(r = 10)),
+    axis.text.x = element_text(color = "#374151", size = 10, angle = 45, hjust = 1, vjust = 1),
+    
+    # Remove redundant legend
+    legend.position = "none"
+  )
+
+ggsave(
+  filename = "bar_chart.png",
+  width = 4.5,
+  height = 3.2,
+  units = "in",
+  dpi = 300,
+  bg = "#FFFFFF"
+)
+```
+
+# Donut chart
+
+```{r}
+df <- data.frame(
+  category = c("Established", "Integrated", "Emerging"),
+  value = c(13, 8, 5)
+)
+
+# Preserve category order and compute slice coordinates
+df$category <- factor(df$category, levels = df$category)
+df$fraction <- df$value / sum(df$value)
+df$ymax <- cumsum(df$fraction)
+df$ymin <- c(0, head(df$ymax, n = -1))
+df$label_pos <- (df$ymax + df$ymin) / 2
+df$label <- paste0(round(df$fraction * 100), "%")
+
+# Custom hex palette for the three sections
+custom_colors <- c(
+  "#00817f",
+  "#42F2FF",
+  "#B92DA4"
+)
+ggplot(df, aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category)) +
+  geom_rect(color = "#FFFFFF", linewidth = 1.2) +
+  # Move labels further past the outer edge (xmax = 4) for clear separation
+  geom_text(
+    aes(x = 5, y = label_pos, label = label),
+    color = "#000000",
+    fontface = "bold",
+    size = 4
+  ) +
+  coord_polar(theta = "y", clip = "off") +
+  # Expand upper radial limit to match the wider label offset
+  xlim(c(2, 5.2)) +
+  scale_fill_manual(values = custom_colors) +
+  labs(
+    title = "OSPO status",
+    fill = NULL
+  ) +
+  # Custom theme built directly via theme() without pre-made presets
+  theme(
+    plot.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.line = element_blank(),
+    plot.margin = margin(t = 20, r = 20, b = 15, l = 20),
+    plot.title = element_text(
+      color = "#111827",
+      size = 14,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(b = 10)
+    ),
+    legend.position = "bottom",
+    legend.background = element_rect(fill = "#FFFFFF", color = NA),
+    legend.key = element_rect(fill = "#FFFFFF", color = NA),
+    legend.text = element_text(color = "#374151", size = 10, margin = margin(r = 12))
+  )
+
+ggsave(
+  filename = "donut_chart.png",
+  width = 4,
+  height = 4,
+  units = "in",
+  dpi = 300,
+  bg = "#FFFFFF"
+)
+```
