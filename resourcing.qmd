@@ -22,7 +22,6 @@ Relevant survey questions:\
 library(readxl)
 library(dplyr)
 library(tibble)
-library(docstring)
 library(readr)
 library(tidyr)
 
@@ -38,16 +37,57 @@ org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="res
 codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
 mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 
-tools_infra <- read_tsv(file.path(cfg$data_path, "tools_infra.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
-ai_topics <- read_tsv(file.path(cfg$data_path, "ai_topics.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
-ai_usage <- read_tsv(file.path(cfg$data_path, "ai_usage.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
-tools_reliance <- read_tsv(file.path(cfg$data_path, "tools_reliance.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ospo_funding <- read_tsv(file.path(cfg$data_path, "ospo_funding.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 blockers <- read_tsv(file.path(cfg$data_path, "blockers.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 ```
 
 
+
+# How are OSPOs funded?
+First, inspect answers from each org and check for disagreement from within the same org.
+```{r}
+ospo_funding$organization <- org_responses$organization
+
+dupes <- ospo_funding |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  arrange(organization, .by_group = TRUE)
+
+# Keep commented for privacy!!
+# dupes
+```
+
+As usual, there is some disagreement. Let's consolidate using my go-to heuristic: if anybody from that org said yes, then it's a yes from that org.
+
+```{r}
+ospo_funding_consolidated <- consolidate_org_responses_yn(ospo_funding)
+```
+
+
+```{r}
+count_yes_responses(ospo_funding_consolidated)
+```
+
+On average, how many resourcing sources does each OSPO have?
+
+```{r}
+# Convert y/n to 1/0
+tmp <- ospo_funding_consolidated |>
+  mutate(across(names(ospo_funding_consolidated)[-1], ~ if_else(. == "Yes", 1, 0))) |>
+  select(-organization)
+
+# Get mean number of yeses per row (organization)
+mean(rowSums(tmp))
+```
+
+Also inspecting the write-in answers.
+
+```{r}
+# Keep commented for privacy!!
+#sata_other$ospo_funding_other
+```
 
 
 # What fraction of OSPO contributors are volunteers?
@@ -90,3 +130,45 @@ volunteers_consolidated <- volunteers |>
 
 volunteers_consolidated |> count(volunteers)
 ```
+
+# What are the OSPOs' biggest blockers?
+
+This was a matrix question. I'll start by recoding the likert scale responses to numbers.
+
+```{r}
+score_map <- c(
+  "Not a blocker for us" = 0L,
+  "Minor, we work around it" = 1L,
+  "Moderate, it slows us down" = 2L,
+  "Major, it limits our impact" = 3L
+)
+
+# Convert all text columns to numeric values
+blockers_numeric <- blockers |>
+  mutate(across(everything(), ~ score_map[.x]))
+```
+
+Hmm. I considered consolidating these to per-organization answers, but this feels like a pretty individualized question, so I'm actually not going to worry about multiple answers from the same org. We are just doing a survey of OSPO workers, and some of them happen to be from the same OSPO, but we're not going to consider that a concerning source of variation.
+
+Also, I see that there are quite a few NAs. This can skew our averages. I'm going to report 2 numbers: severity (average of answers) and reach (how many people answered).
+
+```{r}
+summary_table <- blockers_numeric |>
+  pivot_longer(
+    cols = everything(),
+    names_to = "challenge",
+    values_to = "score"
+  ) |>
+  group_by(challenge) |>
+  summarise(
+    responses = sum(!is.na(score)),
+    reach_pct = round(mean(!is.na(score)) * 100, 1),
+    severity = round(mean(score, na.rm = TRUE), 2),
+  ) |>
+  arrange(desc(severity))
+
+print(summary_table)
+```
+
+Okay, so most of the questions had a response rate of >90%. That's good. In that case, I don't feel too bad about reporting severity only, as reach doesn't vary much.
+

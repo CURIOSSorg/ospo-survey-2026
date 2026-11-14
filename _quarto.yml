@@ -1,5 +1,5 @@
 project:
-  output-dir: notebook_pdfs
+  output-dir: pdfs
   execute-dir: project
 format: 
   pdf: default

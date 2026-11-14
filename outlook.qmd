@@ -1,0 +1,131 @@
+---
+title: "Resourcing"
+---
+
+# Overview
+
+Analyzing questions related to future prospects for OSPOs.
+
+Research questions:\
+What does the next two years hold for OSPOs?\
+Where are OSPO staff working to grow?
+
+Survey questions:\
+Over the next two years, what do you expect to happen to your OSPO or OSPO-like function?\
+What is the time horizon of your current funding or allocation?\
+Which areas do you expect to become more important for your OSPO over the next two years?\
+Which area would you most like to grow, and what is stopping you?\
+What skill or expertise do you most wish you or your OSPO had more of?\
+
+
+# Import packages, utilities, and config variables
+```{r}
+library(readxl)
+library(dplyr)
+library(tibble)
+library(readr)
+library(tidyr)
+
+source("utils.R")
+
+# Read config.yml
+cfg <- config::get()
+```
+
+# Load data
+```{r}
+mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+future <- read_tsv(file.path(cfg$data_path, "future_areas.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ospo_loc <- read_tsv(file.path(cfg$data_path, "ospo_location.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
+mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+# What does the next two years hold for OSPOs?
+
+```{r}
+table(mc_simple$expectations)
+```
+
+```{r}
+table(mc_simple$funding_duration)
+```
+
+Just for my own reassurance, I want to run some chi-square tests on some variables that I suspect might be correlated.
+
+```{r}
+# Expectations vs Funding
+chisq.test(mc_simple$expectations, mc_simple$funding_duration)
+
+# Expectations vs Formalization
+chisq.test(mc_simple$expectations, mc_complex$function_mc)
+
+# Funding vs Formalization
+chisq.test(mc_simple$funding_duration, mc_complex$function_mc)
+```
+
+Well, the last one is bordering on significant, but it's the least interesting of the three relationships.
+
+```{r}
+tmp <- cbind(mc_simple$expectations, ospo_loc)
+names(tmp)[1] <- "expectations"
+tmp |> filter(tto == "Yes")
+tmp |> filter(library == "Yes")
+```
+
+Hmm. I'm forming a hypothesis that OSPOs associated with a TTO are in better shape than those associated with libraries. Let's create an "optimism" score. "Optimists" this their department will either grow or stay the same.
+
+```{r}
+tmp2 <- tmp |>
+  mutate(
+    optimistic = expectations %in% c("Grow (more staff, funding, or scope)", "Stay about the same"),
+    group = ifelse(tto == "Yes", "TTO", "Non-TTO")
+  )|>
+    select(c(optimistic, group))
+
+head(tmp2)
+```
+
+```{r}
+tmp2 |>
+  group_by(group) |>
+  summarise(
+    n = n(),
+    optimistic_count = sum(optimistic, na.rm = TRUE),
+    pct_optimistic = round(100 * mean(optimistic, na.rm = TRUE), 1)
+  )
+```
+
+Meh, not sure if that's a significant trend. Let's test it.
+```{r}
+chisq.test(tmp2$group, tmp2$optimistic)
+```
+
+Nah.
+
+## What areas will be important for OSPOs in the coming years?
+
+I see one person gave all NA responses to this question. I will remove them. Nobody else gave any NAs.
+
+```{r}
+# N.B. this removes rows with NA in ANY column
+dim(future)
+future <- na.omit(future)
+dim(future)
+```
+
+```{r}
+count_yes_responses(future)
+```
+
+# Where are OSPO staff working to grow?
+
+Sending the last two questions to file for qualitative coding.
+
+```{r}
+write_df_to_file(qual$professional_growth, "professional_growth.txt", path_key = "coding_path")
+write_df_to_file(qual$desired_skills, "desired_skills.txt", path_key = "coding_path")
+```
+

@@ -97,11 +97,21 @@ So it looks like the most common answer is "Contributing to institutional or sec
 
 # How are OSPOs engaging with AI, as users?
 
+For this one, let's not consolidate by org since AI usage is largely an individual choice.
+
 ```{r}
-ai_usage$organization <- org_responses$organization
-ai_usage_consolidated <- consolidate_org_responses_yn(ai_usage)
-count_yes_responses(ai_usage_consolidated)
+# ai_usage$organization <- org_responses$organization
+# ai_usage_consolidated <- consolidate_org_responses_yn(ai_usage)
+# count_yes_responses(ai_usage_consolidated)
 ```
+
+```{r}
+# Count rows where ai_use_none OR ai_use_avoid is "Yes"
+count <- sum(ai_usage$ai_use_none == "Yes" | ai_usage$ai_use_avoid == "Yes", na.rm = TRUE)
+(nrow(ai_usage) - count) / nrow(ai_usage)
+```
+
+^ This is the percent of respondents who do not use AI at all in their daily work
 
 # What tools do OSPOs rely on?
 
