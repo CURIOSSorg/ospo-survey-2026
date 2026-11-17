@@ -1,5 +1,7 @@
 project:
   output-dir: pdfs
   execute-dir: project
+  render:
+    - "*.qmd"
 format: 
   pdf: default

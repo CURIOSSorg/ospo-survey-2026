@@ -10,6 +10,8 @@ Since this is a relatively small project with relatively simple figures, I'll tr
 ```{r}
 library(ggplot2)
 library(forcats)
+library(dplyr)
+library(ggrepel)
 
 source("utils.R")
 
@@ -168,9 +170,9 @@ final_plot <- ggplot(df, aes(x = laboriousness, y = pervasiveness)) +
   ) +
 
   labs(
-    title = "Pervasiveness and laboriousness of OSPO activities",
+    title = "Pervasiveness vs. laboriousness of OSPO activities",
     x = "Laboriousness (relative hours spent)",
-    y = "Pervasiveness\n(% of respondents doing ≥ 1 sub-activity)"
+    y = "Pervasiveness\n(% of respondents who engage in the activity)"
   ) +
   # Pass the calculated limits into coord_cartesian
   coord_cartesian(xlim = c(min_x, max_x), ylim = c(.7, 1))
