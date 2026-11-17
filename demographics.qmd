@@ -4,7 +4,7 @@ title: "Demographics"
 
 # Overview
 
-Here is my initial exploration of participant demographics.
+Here is my exploration of participant demographics.
 
 Here are my research questions:\
 - How many respondents took the survey, and from how many institutions?\
