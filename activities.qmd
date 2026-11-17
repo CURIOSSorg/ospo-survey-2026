@@ -124,7 +124,8 @@ ospo
 Let's look at the upper quartile of activities, sorted by how widespread they are among OSPOs.
 
 ```{r}
-mega_df <- rbind(bp, edu, ext, tools, cb, ps, ap, fs, ospo)
+df_list <- list(bp, edu, ext, tools, cb, ps, ap, fs, ospo)
+mega_df <- bind_rows(df_list)
 top_quartile <- mega_df |>
   filter(count >= quantile(count, 0.75)) |>
   arrange(desc(count))
@@ -139,11 +140,105 @@ mega_df |> filter(count <= quantile(count, 0.25)) |> arrange(count)
 
 That is pretty interesting! OSPOs are too poor for these activities lol.
 
+## Quantifying "commonness" or "pervasiveness"
+
+I'd love to get a single number that represents how common or widespread each activity category is. Because the subcategories each have their own score, I'm not sure that there's a clear-cut way to do this. So here I'm trying a couple of different things and trying to decide what is most intuitive and accurate.
+
+First, let's take the average score of all the subcategories in each category.
+```{r}
+how_common <- sapply(df_list, function(df) mean(df$count, na.rm = TRUE))
+names(how_common) <- c("bp", "edu", "ext", "tools", "cb", "ps", "ap", "fs", "ospo")
+how_common <- sort(how_common, decreasing = TRUE)
+how_common
+```
+
+Next, let's try taking the maximum, most widespread sub-category/sub-activity. How does this change the order of the ranking?
+```{r}
+how_common <- sapply(df_list, function(df) max(df$count, na.rm = TRUE))
+names(how_common) <- c("bp", "edu", "ext", "tools", "cb", "ps", "ap", "fs", "ospo")
+how_common <- sort(how_common, decreasing = TRUE)
+how_common
+```
+
+Wow, that does change the ranking quite a bit. We need a different approach.
+
+Okay, starting over. I want a simple metric so I'm not going to consolidate by organization. I'm just going to ask, how many people checked at least one activity in this category, for each category.
+```{r}
+best_practices <- read_tsv(file.path(cfg$data_path, "best_practices.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+edu_efforts <- read_tsv(file.path(cfg$data_path, "edu_efforts.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ext_partnerships <- read_tsv(file.path(cfg$data_path, "ext_partnerships.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+tools_infra <- read_tsv(file.path(cfg$data_path, "tools_infra.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+comm_building <- read_tsv(file.path(cfg$data_path, "comm_building.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+project_support <- read_tsv(file.path(cfg$data_path, "project_support.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+advocacy_policy <- read_tsv(file.path(cfg$data_path, "advocacy_policy.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+funding_support <- read_tsv(file.path(cfg$data_path, "funding_support.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ospo_ops <- read_tsv(file.path(cfg$data_path, "ospo_ops.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+```
+
+Change df entries from "yes" and "no" to numeric so we can count the yeses.
+
+```{r}
+bp2 <- best_practices |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+```
+
+Let's call this metric "reach", because it's about the number of people engaging with it.
+```{r}
+rowSums(bp2, na.rm = TRUE) > 0
+reach <- sum(rowSums(bp2, na.rm = TRUE) > 0)
+reach
+```
+
+Great. Let's repeat this for all nine activity categories.
+
+```{r}
+edu2 <- edu_efforts |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+ext2 <- ext_partnerships |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+tools2 <- tools_infra |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+cb2 <- comm_building |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+ps2 <- project_support |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+ap2 <- advocacy_policy |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+fs2 <- funding_support |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+
+ospo2 <- ospo_ops |>
+  mutate(across(where(is.character), ~ recode_values(.x, "Yes" ~ 1, "No" ~ 0)))
+```
+
+```{r}
+df_list2 <- list(bp2, edu2, ext2, tools2, cb2, ps2, ap2, fs2, ospo2)
+names(df_list2) <- c("bp", "edu", "ext", "tools", "cb", "ps", "ap", "fs", "ospo")
+
+reach_scores <- sapply(df_list2, function(x) 
+sum(rowSums(x, na.rm = TRUE) > 0)
+)
+reach_scores <- sort(reach_scores, decreasing = TRUE)
+reach_scores
+```
+
+Print as percentages
+
+```{r}
+round(reach_scores/nrow(df_list2[[1]])*100, digits = 1)
+```
+
 # Which activities take the most time?
 
 Let's say that every time an activity is ranked #1, it gets 3 points, when it's ranked #2, it gets 2 point, and when it's ranked #3, it gets 1 point.
 
-I think in this case I will not filter to one response per organization, since the survey said, "Answer for yourself, not the whole team." So we can interpret this as, how OSPO workers spend their time.
+I think in this case I will again not filter to one response per organization, since the survey said, "Answer for yourself, not the whole team." So we can interpret this as, how OSPO workers spend their time.
 
 ```{r}
 activity_scores <- ranking |>
@@ -167,5 +262,12 @@ activity_scores
 ```
 
 Note: from manual inspection I see that one person did not answer this question. That's where the NAs come from.
+
+What percent of respondents ranked each task as their #1? I wonder if this method changes the ranking.
+```{r}
+table(ranking$rank1)
+```
+
+Cool, the order is the same.
 
 Note: I manually reviewed the "other" answers and didn't see anything super compelling. I did add a couple of "lessons learned" based on answers that people wrote in and that I think should be survey options next time.

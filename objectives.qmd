@@ -19,6 +19,7 @@ library(readxl)
 library(dplyr)
 library(docstring)
 library(readr)
+library(tibble)
 
 source("utils.R")
 
@@ -34,10 +35,12 @@ org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="res
 objs <- read_tsv(file.path(cfg$data_path, "objectives.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+auds <- read_tsv(file.path(cfg$data_path, "audiences.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
 ```
 
-# Scope/audience
-What is each OSPO's scope/audience? Hopefully responses from the same institution match, but let's check. 
+# Scope
+What is each OSPO's scope? Hopefully responses from the same institution match, but let's check. 
 ```{r}
 org_responses$scope <- mc_simple$scope
 dupes <- org_responses |>
@@ -137,6 +140,19 @@ Check out the overall scores for each objective
 sort(colSums(org_objs_avgd[,-1]), decreasing = TRUE)
 ```
 
+Does taking everybody's response equally, without any average, affect the ranking?
+
+```{r}
+# N.B. this removes rows with NA in ANY column
+dim(objs_numeric)
+objs_numeric <- na.omit(objs_numeric)
+dim(objs_numeric)
+
+sort(colSums(objs_numeric), decreasing = TRUE)
+```
+
+Policy, support, and engagement are switched around, but everything else is the same as before. I think I'll report the per-person scores rather than the per-organization scores, since they are simpler to understand.
+
 # Metrics
 This was a slightly sneaky "simple multiple choice" question in that it doesn't use an "other" field, but it was followed by a very closely related qualitative question. Let's save those qualitative answers to a file for coding. Note that for this one we are NOT filtering to one response per institution.
 
@@ -176,4 +192,20 @@ Sending the question about the OSPO's elevator pitch straight to file for qualit
 
 ```{r}
 write_df_to_file(qual$pitch, "pitch.txt", path_key = "coding_path")
+```
+
+# Audiences
+Which audiences do OSPOs engage with regularly?
+
+I see one person gave all NA responses to this question. I will remove them. Nobody else gave any NAs.
+
+```{r}
+# N.B. this removes rows with NA in ANY column
+dim(auds)
+auds <- na.omit(auds)
+dim(auds)
+```
+
+```{r}
+count_yes_responses(auds)
 ```

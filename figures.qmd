@@ -6,9 +6,10 @@ title: "Figures"
 
 Since this is a relatively small project with relatively simple figures, I'll try just making all the figures in one notebook from hard-coded numbers, and we'll see how that goes.
 
-# Bar chart
+# Bar charts
 ```{r}
 library(ggplot2)
+library(forcats)
 
 source("utils.R")
 
@@ -16,6 +17,7 @@ source("utils.R")
 cfg <- config::get()
 ```
 
+## OSPO Location
 ```{r}
 df <- data.frame(
   category = c(
@@ -35,57 +37,12 @@ df$category <- factor(df$category, levels = unique(df$category))
 ```
 
 ```{r}
-# Custom hex palette
-# custom_colors <- c(
-#   "#00817f",
-#   "#42F2FF",
-#   "#B92DA4",
-#   "#F7D00B",
-#   "#124B5C",
-#   "#6A1B70",
-#   "#F27405",
-#   "#D9A00E"
-# )
+basic_bar_chart(df, x_var="category", y_var="value", title="OSPO Locations", ylabel="Number of OSPOs")
+```
 
-
-ggplot(df, aes(x = category, y = value)) +
-  geom_col(width = 0.6, fill = "#39a695") +
-  scale_fill_manual(values = "#39a695") +
-  # Anchor bars flush to the x-axis with 10% headroom at the top
-  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
-  labs(
-    title = "OSPO locations",
-    x = NULL,
-    y = "Number of OSPOs"
-  ) +
-
-theme(
-    # Canvas backgrounds
-    plot.background = element_rect(fill = "#FFFFFF", color = NA),
-    panel.background = element_rect(fill = "#FFFFFF", color = NA),
-    
-    # Subtle horizontal gridlines only
-    panel.grid.major.y = element_line(color = "#E5E7EB", linewidth = 0.5),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor = element_blank(),
-    
-    # Clean baseline axis without tick marks
-    axis.line.x = element_line(color = "#374151", linewidth = 0.6),
-    axis.line.y = element_blank(),
-    axis.ticks = element_blank(),
-    
-    # Typography and spacing
-    plot.margin = margin(t = 20, r = 20, b = 15, l = 15),
-    plot.title = element_text(color = "#111827", size = 14, face = "bold", margin = margin(b = 15)),
-    axis.title.y = element_text(color = "#374151", size = 11, margin = margin(r = 10)),
-    axis.text.x = element_text(color = "#374151", size = 10, angle = 45, hjust = 1, vjust = 1),
-    
-    # Remove redundant legend
-    legend.position = "none"
-  )
-
+```{r}
 ggsave(
-  filename = "bar_chart.png",
+  filename = file.path(cfg$figure_path, "ospo_locations.png"),
   width = 4.5,
   height = 3.2,
   units = "in",
@@ -93,6 +50,145 @@ ggsave(
   bg = "#FFFFFF"
 )
 ```
+
+## Objectives
+```{r}
+df <- data.frame(
+  category = c(
+    "Enabling good practices",
+    "Supporting existing projects",
+    "Developing institutional policy",
+    "Engaging with the broader ecosystem",
+    "Scaling OS participation",
+    "Removing blockers to OS work",
+    "Building an internal OS community"
+  ),
+  value = c(89, 77, 74, 73, 72, 68, 67)
+)
+df <- reorder_factor_by_column(df, category, value, descending = FALSE)
+```
+
+```{r}
+plt <- basic_bar_chart(
+  df,
+  x_var = "category",
+  y_var = "value",
+  title = "OSPO Objectives",
+  ylabel = "Score",
+  show_axis_title_x = TRUE,
+  show_axis_title_y = FALSE,
+  horizontal = TRUE,
+  show_ticks_y = FALSE,
+  plot_title_margin_b = 5,
+  x_axis_title_margin_t = 5
+)
+
+plt + 
+   # Expands y-axis by 15% on the upper end
+  scale_y_continuous(
+  expand = expansion(mult = c(0, .15))
+  )
+```
+
+```{r}
+ggsave(
+  filename = file.path(cfg$figure_path, "objectives.png"),
+  width = 6,
+  height = 3,
+  units = "in",
+  dpi = 300,
+  bg = "#FFFFFF"
+)
+```
+
+# Scatter plot
+## Activities
+```{r}
+df <- data.frame(
+  category = c(
+    "OSPO operations and strategy",
+    "Community building",
+    "External partnerships and tech transfer",
+    "Directly supporting open source projects",
+    "Educational efforts",
+    "Advocacy and policy",
+    "Developing and sharing best practices",
+    "Supporting tools and infrastructure",
+    "Funding and financial support"
+  ),
+  laboriousness = c(35, 31, 31, 23, 21, 14, 13, 13, 10),
+  pervasiveness = c(0.879, 0.848, 0.939, 0.788, 0.939, 0.939, 0.939, 0.788, 0.758)
+)
+```
+                 
+ 
+By default, the data are very spread out across the plot so it's hard to take in the whole dataset. I'll zoom out to make the dataset easier to see. Here I'll adjust the amount of padding I want to add to the x and y axes.
+
+```{r}
+pad_prop <- 0.10 
+
+# Calculate the maximums and add the padding proportion
+max_x <- max(df$laboriousness) * (1 + pad_prop)
+max_y <- max(df$pervasiveness) * (1 + pad_prop)
+min_x <- min(df$laboriousness) * (1 - pad_prop)
+min_y <- min(df$pervasiveness) * (1 -pad_prop)
+```
+
+```{r fig.width=9, fig.height=8}
+final_plot <- ggplot(df, aes(x = laboriousness, y = pervasiveness)) +
+  geom_point(color = "#00817f", size = 2.8) +
+  scale_y_continuous(labels = scales::percent) +
+
+  # Add activity labels
+  ggrepel::geom_text_repel(
+    aes(label = category),
+    size = 3.2,
+    box.padding = 0.5,
+    point.padding = 0.5,
+    segment.color = "grey50"
+  ) +
+
+  theme(
+    axis.title.x = element_text(size = 11),
+    axis.title.y = element_text(size = 11),
+    axis.text.x = element_text(angle = 60, vjust = 0.6, size = 11),
+    axis.text.y = element_text(size = 11),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    legend.title = element_blank(),
+    plot.title = element_text(
+      hjust = 0,
+      face = "bold",
+      size = 14,
+      margin = margin(b = 5)
+    ),
+    plot.margin = unit(c(0.3, 0.3, 0.3, 0.9), "cm"),
+    panel.grid = element_line(linetype = "solid", color = "gray90"),
+    panel.background = element_blank()
+  ) +
+
+  labs(
+    title = "Pervasiveness and laboriousness of OSPO activities",
+    x = "Laboriousness (relative hours spent)",
+    y = "Pervasiveness\n(% of respondents doing ≥ 1 sub-activity)"
+  ) +
+  # Pass the calculated limits into coord_cartesian
+  coord_cartesian(xlim = c(min_x, max_x), ylim = c(.7, 1))
+
+  final_plot
+```
+
+```{r}
+ggsave(
+  filename = file.path(cfg$figure_path, "activities.png"),
+  width = 7.2,
+  height = 3.6,
+  units = "in",
+  dpi = 500,
+  bg = "#FFFFFF"
+)
+```
+
 
 # Donut chart
 
@@ -118,16 +214,14 @@ custom_colors <- c(
 )
 ggplot(df, aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category)) +
   geom_rect(color = "#FFFFFF", linewidth = 1.2) +
-  # Move labels further past the outer edge (xmax = 4) for clear separation
   geom_text(
-    aes(x = 5, y = label_pos, label = label),
+    aes(x = 4.4, y = label_pos, label = label),
     color = "#000000",
     fontface = "bold",
     size = 4
   ) +
   coord_polar(theta = "y", clip = "off") +
-  # Expand upper radial limit to match the wider label offset
-  xlim(c(2, 5.2)) +
+  scale_x_continuous(limits = c(3, 5), expand = c(0, 0)) +
   scale_fill_manual(values = custom_colors) +
   labs(
     title = "OSPO status",
@@ -142,24 +236,26 @@ ggplot(df, aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category)) +
     axis.text = element_blank(),
     axis.ticks = element_blank(),
     axis.line = element_blank(),
-    plot.margin = margin(t = 20, r = 20, b = 15, l = 20),
+    plot.margin = margin(t = 5, r = 20, b = 5, l = 20),
     plot.title = element_text(
       color = "#111827",
       size = 14,
       face = "bold",
       hjust = 0.5,
-      margin = margin(b = 10)
+      margin = margin(b = -45)
     ),
     legend.position = "bottom",
+    legend.box.spacing = unit(0, "pt"), # Removes gap between panel and legend
+    legend.margin = margin(t = -55, b=2),
     legend.background = element_rect(fill = "#FFFFFF", color = NA),
     legend.key = element_rect(fill = "#FFFFFF", color = NA),
-    legend.text = element_text(color = "#374151", size = 10, margin = margin(r = 12))
+    legend.text = element_text(color = "#374151", size = 10, margin = margin(t=0))
   )
 
 ggsave(
-  filename = "donut_chart.png",
+  filename = file.path(cfg$figure_path, "donut_chart.png"),
   width = 4,
-  height = 4,
+  height = 3,
   units = "in",
   dpi = 300,
   bg = "#FFFFFF"

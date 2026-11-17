@@ -172,3 +172,185 @@ tally_matrix_vals_by_org <- function(
     arrange(desc(count)) |>
     select(count, tip, nickname)
 }
+
+
+################ Utils for plotting ################
+
+COLORS <- c(
+  "#00817f",
+  "#42F2FF",
+  "#060606",
+  "#F7D00B",
+  "#124B5C",
+  "#6A1B70",
+  "#F27405",
+  "#D9A00E"
+)
+
+# Re-order factor levels in one column by values in another.
+# Returns the original data frame with factor_col re-ordered based on value_col.
+# Leave column names unquoted.
+reorder_factor_by_column <- function(
+  df,
+  factor_col,
+  value_col,
+  descending = TRUE
+) {
+  df <- df %>%
+    mutate(
+      {{ factor_col }} := fct_reorder(
+        # double-curlys and := assign a col by name using tidy evaluation
+        .f = {{ factor_col }},
+        .x = {{ value_col }},
+        .fun = if (descending) `-` else identity # If descending = TRUE, add a negative sign (-) to reverse the sort
+      )
+    )
+  return(df)
+}
+
+
+basic_bar_chart <- function(
+  df,
+  x_var,
+  y_var,
+  title,
+  ylabel = "Number of respondents",
+  show_axis_title_x = FALSE,
+  show_axis_title_y = TRUE,
+  axis_title_size_x = 11,
+  axis_title_size_y = 11,
+  axis_text_size_x = 10,
+  axis_text_size_y = 10,
+  title_size = 14,
+  axis_text_angle_x = 45,
+  color_index = 1,
+  horizontal = FALSE,
+  show_ticks_x = FALSE,
+  show_ticks_y = TRUE,
+  show_bar_labels = FALSE,
+  label_position = c("inside", "above"),
+  label_color = "white",
+  label_size = 8,
+  show_grid = TRUE,
+  percent = FALSE,
+  plot_title_margin_b = 15,
+  x_axis_title_margin_t = 15,
+  margin_vals = c(0.3, 0.3, 0.3, 0.3)
+) {
+  label_position <- match.arg(label_position)
+
+  # Axis title settings
+  axis_title_x <- if (show_axis_title_x) {
+    element_text(
+      size = axis_title_size_x,
+      margin = margin(t = x_axis_title_margin_t)
+    )
+  } else {
+    element_blank()
+  }
+  axis_title_y <- if (show_axis_title_y) {
+    element_text(
+      size = axis_title_size_y,
+      margin = margin(r = 15)
+    )
+  } else {
+    element_blank()
+  }
+
+  # Axis tick settings
+  axis_ticks_x <- if (show_ticks_x) element_line() else element_blank()
+  axis_ticks_y <- if (show_ticks_y) element_line() else element_blank()
+
+  # Build the plot
+  p <- ggplot(df, aes(x = .data[[x_var]], y = .data[[y_var]])) +
+    geom_bar(stat = "identity", fill = COLORS[[color_index]]) +
+    ggtitle(title) +
+    labs(y = ifelse(is.null(ylabel), "Number of Respondents", ylabel)) +
+    theme(
+      axis.title.x = axis_title_x,
+      axis.title.y = axis_title_y,
+      axis.text.x = element_text(
+        angle = axis_text_angle_x,
+        hjust = 1,
+        vjust = 1,
+        size = axis_text_size_x
+      ),
+      axis.text.y = element_text(size = axis_text_size_y),
+      axis.ticks.x = axis_ticks_x,
+      axis.ticks.y = axis_ticks_y,
+      legend.position = "none",
+      panel.background = element_blank(),
+      panel.grid = if (show_grid) {
+        element_line(linetype = "solid", color = "gray90")
+      } else {
+        element_blank()
+      },
+      plot.title = element_text(
+        hjust = 0,
+        face = "bold",
+        size = title_size,
+        margin = margin(b = plot_title_margin_b)
+      ),
+      plot.margin = unit(margin_vals, "cm")
+    )
+
+  # Convert y-axis values from proportion to percent (optional)
+  if (percent) {
+    p <- p +
+      scale_y_continuous(labels = scales::percent)
+  }
+
+  # Add text labels (optional)
+  if (show_bar_labels) {
+    if (horizontal) {
+      p <- p +
+        geom_text(
+          aes(
+            # if percent=TRUE, format the y‐var as a percent; otherwise just show the raw value
+            label = if (percent) {
+              scales::percent(.data[[y_var]], accuracy = 1)
+              # accuracy says use whole-number percentage, no decimal
+            } else {
+              .data[[y_var]]
+            }
+          ),
+          color = label_color,
+          size = label_size,
+          hjust = if (label_position == "inside") 1.2 else -0.1, # shift left of bar end
+          vjust = 0.5
+        )
+    } else {
+      # vertical bars
+      p <- p +
+        geom_text(
+          aes(
+            # if percent=TRUE, format the y‐var as a percent; otherwise just show the raw value
+            label = if (percent) {
+              scales::percent(.data[[y_var]], accuracy = 1)
+              # accuracy says use whole-number percentage, no decimal
+            } else {
+              .data[[y_var]]
+            }
+          ),
+          color = label_color,
+          size = label_size,
+          vjust = if (label_position == "inside") 1.2 else -0.3, # above bar = negative vjust
+          hjust = 0.5
+        )
+    }
+  }
+
+  # Flip coordinates if horizontal
+  if (horizontal) {
+    p <- p +
+      coord_flip() +
+      theme(
+        axis.text.y = element_text(
+          margin = margin(r = 8),
+          vjust = 0.5
+        )
+      )
+  }
+
+  return(p)
+}
