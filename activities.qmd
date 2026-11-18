@@ -9,6 +9,7 @@ Analyzing questions related to OSPO activities and services.
 Research questions:\
 - What services do OSPOs most commonly offer?\
 - How do OSPOs spend the bulk of their time?\
+- Do differently-located OSPOs offer different services?
 
 Survey questions:\
 - Tick the activities your OSPO actually carries out today:\
@@ -29,7 +30,6 @@ Survey questions:\
 library(readxl)
 library(dplyr)
 library(tibble)
-library(docstring)
 library(readr)
 library(tidyr)
 
@@ -54,9 +54,10 @@ funding_support <- read_tsv(file.path(cfg$data_path, "funding_support.tsv"), sho
 ospo_ops <- read_tsv(file.path(cfg$data_path, "ospo_ops.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 ranking <- read_tsv(file.path(cfg$data_path, "ranking.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 sata_other <- read_tsv(file.path(cfg$data_path, "sata_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
+ospo_loc <- read_tsv(file.path(cfg$data_path, "ospo_location.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 ```
 
-# What services do OSPOs most commonly offer?
+# What services do OSPOs most commonly offer? (one response per ospo)
 
 ```{r}
 best_practices$organization <- org_responses$organization
@@ -139,6 +140,83 @@ mega_df |> filter(count <= quantile(count, 0.25)) |> arrange(count)
 ```
 
 That is pretty interesting! OSPOs are too poor for these activities lol.
+
+## Do differently-located OSPOs offer different services? (one response per ospo)
+
+To begin, let's create a data frame with each organization and its various locations.
+
+```{r}
+ospo_loc$organization <- org_responses$organization
+loc <- consolidate_org_responses_yn(ospo_loc)
+```
+
+
+```{r}
+# Use tibble::lst() so object names are kept as category names
+df_list <- lst(bp_consolidated, edu_consolidated, ext_consolidated, tools_consolidated, cb_consolidated, ps_consolidated, ap_consolidated, fs_consolidated, ospo_consolidated)
+
+# Classify organizations (accounting for `joint` and all-"No" rows)
+other_cols <- setdiff(names(loc), c("organization", "tto"))
+org_groups <- loc |>
+  mutate(
+    total_yes = rowSums(across(-organization, ~ .x == "Yes"), na.rm = TRUE),
+    group = case_when(
+      library == "Yes" & total_yes == 1 ~ "Library_only",
+      tto == "Yes"     & total_yes == 1 ~ "TTO_only",
+      total_yes >= 1                    ~ "Other",
+      TRUE                              ~ NA_character_
+    ),
+    group = factor(group, levels = c("Library_only", "TTO_only", "Other"))
+  ) |>
+  filter(!is.na(group)) |>
+  select(organization, group)
+
+head(org_groups)
+# Check group sample sizes
+count(org_groups, group)
+```
+
+```{r}
+services_long <- df_list |>
+  lapply(\(df) {
+    pivot_longer(
+      df,
+      cols = -organization,
+      names_to = "service",
+      values_to = "offered"
+    )
+  }) |>
+  bind_rows(.id = "category") |>
+  mutate(
+    category = sub("_consolidated$", "", category),
+    offered  = factor(offered, levels = c("Yes", "No"))
+  ) |>
+  filter(!is.na(offered))
+
+head(services_long)
+```
+
+```{r}
+service_comparison <- services_long |>
+  inner_join(org_groups, by = "organization") |>
+  group_by(category, service) |>
+  summarise(
+    pct_tto = round(100 * mean(offered[group == "TTO_only"] == "Yes"), 1),
+    pct_lib = round(100 * mean(offered[group == "Library_only"] == "Yes"), 1),
+    pct_oth = round(100 * mean(offered[group == "Other"] == "Yes"), 1),
+    p_val   = fisher.test(table(group, offered))$p.value,
+    .groups = "drop"
+  ) |>
+  mutate(
+    max_spread = pmax(pct_lib, pct_tto, pct_oth) - pmin(pct_lib, pct_tto, pct_oth),
+    p_adj      = p.adjust(p_val, method = "BH")
+  ) |>
+  arrange(desc(max_spread))
+
+subset(service_comparison, p_val < 0.05)
+```
+
+Technically none of these are statistically significant by the Fisher's exact test, but I think they are all socially significant.
 
 ## Quantifying "commonness" or "pervasiveness"
 
@@ -271,3 +349,4 @@ table(ranking$rank1)
 Cool, the order is the same.
 
 Note: I manually reviewed the "other" answers and didn't see anything super compelling. I did add a couple of "lessons learned" based on answers that people wrote in and that I think should be survey options next time.
+

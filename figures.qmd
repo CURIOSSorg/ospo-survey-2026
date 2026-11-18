@@ -103,6 +103,69 @@ ggsave(
 )
 ```
 
+## Funding sources
+
+```{r}
+df <- data.frame(
+  category = c(
+    "Grant funding for the OSPO",
+    "Time formally allocated from existing roles",
+    "Informal 'side of desk' time",
+    "Funding from research grants",
+    "Dedicated institutional budget",
+    "Volunteer time outside work"
+    ),
+    value = c(
+      15,
+      14,
+      12,
+      5,
+      4,
+      3
+    )
+)
+
+df$value <- df$value/27
+df <- reorder_factor_by_column(df, category, value, descending = FALSE)
+```
+
+
+```{r}
+plt <- basic_bar_chart(
+  df,
+  x_var = "category",
+  y_var = "value",
+  title = "OSPO funding sources",
+  ylabel = "% of OSPOs that have this",
+  plot_title_margin_b = 5,
+  x_axis_title_margin_t = 5,
+  horizontal = TRUE,
+  show_axis_title_x = TRUE,
+  show_axis_title_y = FALSE
+)
+
+plt <- plt +
+   # Expands y-axis by 15% on the upper end
+  scale_y_continuous(
+  expand = expansion(mult = c(0, .15)),
+  labels = scales::percent
+  )
+
+plt
+```
+
+```{r}
+ggsave(
+  filename = file.path(cfg$figure_path, "funding.png"),
+  width = 8,
+  height = 4,
+  units = "in",
+  dpi = 400,
+  bg = "#FFFFFF"
+)
+```
+
+
 # Scatter plot
 ## Activities
 ```{r}
@@ -170,9 +233,9 @@ final_plot <- ggplot(df, aes(x = laboriousness, y = pervasiveness)) +
   ) +
 
   labs(
-    title = "Pervasiveness vs. laboriousness of OSPO activities",
+    title = "Prevalence vs. laboriousness of OSPO activities",
     x = "Laboriousness (relative hours spent)",
-    y = "Pervasiveness\n(% of respondents who engage in the activity)"
+    y = "Prevalence\n(% of respondents who engage in the activity)"
   ) +
   # Pass the calculated limits into coord_cartesian
   coord_cartesian(xlim = c(min_x, max_x), ylim = c(.7, 1))
