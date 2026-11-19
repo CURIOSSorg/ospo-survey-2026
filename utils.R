@@ -181,10 +181,10 @@ COLORS <- c(
   "#42F2FF",
   "#060606",
   "#F7D00B",
-  "#124B5C",
   "#6A1B70",
   "#F27405",
-  "#D9A00E"
+  "#D9A00E",
+  "#124B5C"
 )
 
 # Re-order factor levels in one column by values in another.

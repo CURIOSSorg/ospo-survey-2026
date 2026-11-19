@@ -8,6 +8,7 @@ Analyzing questions related to funding and constraints.
 
 Research questions:\
 - How are OSPOs funded?\
+- What are their funding horizons?
 - What fraction of OSPO contributors are volunteers?\
 - What are the OSPOs' biggest blockers?\
 
@@ -67,7 +68,17 @@ ospo_funding_consolidated <- consolidate_org_responses_yn(ospo_funding)
 
 
 ```{r}
-count_yes_responses(ospo_funding_consolidated)
+result <- count_yes_responses(ospo_funding_consolidated)
+result
+```
+
+How many OSPOs receive some sort of grant funding, either directly or indirectly?
+
+```{r}
+# Those that receive grant funding
+sum(result$count[grepl("grant", result$nickname)])
+# Total
+nrow(ospo_funding_consolidated)
 ```
 
 On average, how many resourcing sources does each OSPO have?
@@ -172,3 +183,8 @@ print(summary_table)
 
 Okay, so most of the questions had a response rate of >90%. That's good. In that case, I don't feel too bad about reporting severity only, as reach doesn't vary much.
 
+# How long will the OSPOs' funding last?
+
+```{r}
+table(mc_simple$funding_duration)
+```

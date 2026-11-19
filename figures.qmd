@@ -257,6 +257,7 @@ ggsave(
 
 # Donut chart
 
+## OSPO maturity
 ```{r}
 df <- data.frame(
   category = c("Established", "Integrated", "Emerging"),
@@ -292,8 +293,8 @@ ggplot(df, aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category)) +
     title = "OSPO status",
     fill = NULL
   ) +
-  # Custom theme built directly via theme() without pre-made presets
-  theme(
+
+theme(
     plot.background = element_rect(fill = "#FFFFFF", color = NA),
     panel.background = element_rect(fill = "#FFFFFF", color = NA),
     panel.grid = element_blank(),
@@ -318,9 +319,89 @@ ggplot(df, aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category)) +
   )
 
 ggsave(
-  filename = file.path(cfg$figure_path, "donut_chart.png"),
+  filename = file.path(cfg$figure_path, "status.png"),
   width = 4,
   height = 3,
+  units = "in",
+  dpi = 300,
+  bg = "#FFFFFF"
+)
+```
+
+## Demographics
+Here I'm plotting the number of responses from various types of institution. Again, I'm hard-coding the data.
+
+```{r}
+df <- data.frame(
+  category = c(
+    "Independent university",
+    "University in an OSPO Network",
+    "University-hosted research center",
+    "Independent research center",
+    "An OSPO Network",
+    "Other"
+  ),
+  value = c(14, 6, 3, 2, 1, 1)
+)
+```
+
+```{r}
+# Preserve category order and compute slice coordinates
+df$category <- factor(df$category, levels = df$category)
+df$fraction <- df$value / sum(df$value)
+df$ymax <- cumsum(df$fraction)
+df$ymin <- c(0, head(df$ymax, n = -1))
+df$label_pos <- (df$ymax + df$ymin) / 2
+df$label <- paste0(round(df$fraction * 100), "%")
+
+ggplot(df, aes(ymax = ymax, ymin = ymin, xmax = 4, xmin = 3, fill = category)) +
+  geom_rect(color = "#FFFFFF", linewidth = 1.2) +
+  geom_text(
+    aes(x = 4.4, y = label_pos, label = label),
+    color = "#000000",
+    fontface = "bold",
+    size = 4
+  ) +
+  coord_polar(theta = "y", clip = "off") +
+  scale_x_continuous(limits = c(2, 5), expand = c(0, 0)) +
+  scale_fill_manual(values = COLORS) + # from utils.R
+  labs(
+    title = "Institutions represented",
+    fill = NULL
+  ) +
+
+theme(
+    plot.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.background = element_rect(fill = "#FFFFFF", color = NA),
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.line = element_blank(),
+    plot.margin = margin(t = 5, r = 20, b = 5, l = 20),
+    plot.title = element_text(
+      color = "#111827",
+      size = 14,
+      face = "bold",
+      hjust = 0.5,
+      margin = margin(b = -45)
+    ),
+    legend.position = "bottom",
+    legend.box.spacing = unit(0, "pt"), # Removes gap between panel and legend
+    legend.margin = margin(t = -55, b=2),
+    legend.background = element_rect(fill = "#FFFFFF", color = NA),
+    legend.key = element_rect(fill = "#FFFFFF", color = NA),
+    legend.text = element_text(color = "#374151", size = 10, margin = margin(t=0))
+  )
+
+```
+
+
+```{r}
+ggsave(
+  filename = file.path(cfg$figure_path, "demographics.png"),
+  width = 7,
+  height = 3.5,
   units = "in",
   dpi = 300,
   bg = "#FFFFFF"
