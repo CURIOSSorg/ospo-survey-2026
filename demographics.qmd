@@ -92,6 +92,12 @@ table(merged_unique$region)
 
 ^The table above shows represented regions.
 
+## Countries represented
+This is the number of countries represented in the survey, deduced by locating the institutions.
+```{r}
+length(unique(org_responses$country))
+```
+
 Examining what people said for "other"
 
 ```{r}

@@ -185,6 +185,78 @@ Okay, so most of the questions had a response rate of >90%. That's good. In that
 
 # How long will the OSPOs' funding last?
 
+Quick overview
 ```{r}
 table(mc_simple$funding_duration)
+nrow(mc_simple)
+```
+
+These still include duplicates from the same organization. 
+
+```{r}
+mc_simple$organization <- org_responses$organization
+
+dupes <- mc_simple |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  arrange(organization, .by_group = TRUE) |>
+  select(funding_duration, organization)
+
+# Keep commented for privacy!!
+# dupes
+```
+
+Hmm, there are some inconsistencies between people from the same organization. I'm not totally happy with the responses to this question because it was a choose-one multiple choice but the answers are not mutually exclusive.
+
+I'm curious to know how eliminating "embedded OSPOs" might change the data... but will that be misleading?
+
+```{r}
+mc_simple$function_mc <- mc_complex$function_mc
+
+dupes <- mc_simple |>
+  group_by(organization) |>
+  filter(n() > 1) |> 
+  arrange(organization, .by_group = TRUE) |>
+  select(funding_duration, organization, function_mc)
+
+# Keep commented for privacy!!
+# dupes
+```
+
+Oh interesting, actually none of the duplicate responses come from an "embedded" OSPO.
+
+I'm just going to resolve the conflicting duplicates on a case-by-case basis. There are 3 cases:\
+1) Three responses from this org; two match and one is different. I'll take the best two out of three.\
+2) These two respondents disagreed on both the maturity level and the funding horizon. Well, I know these people, and also I'm looking at their website, and I feel pretty confident picking one of these two. I think I know what the other person meant, and the response I am choosing reflects their intention.\
+3) One person responded with "tied to a grant or project end date" and the other person reported the time horizon. I'm not too interested in the time horizon right now because I think this should have been interrogated differently. So I think I'll just mark this org with the first answer. In the end, I'll probably just report permanent funding vs. other so it won't really matter.
+
+I'm just going to create a reference file by hand. I'll store this in my private data folder so that no sensitive information is hard-coded into this script.
+
+```{r}
+dupes_ref <- read_excel(file.path(cfg$curated_path, "funding_horizons.xlsx"))
+```
+
+
+```{r}
+horizon_uniq <- mc_simple |>
+  group_by(organization) |>
+  filter(n() == 1) |>
+  ungroup() |>
+  select(funding_duration, organization, function_mc)
+
+horizon_uniq <- rbind(horizon_uniq, dupes_ref)
+dim(horizon_uniq)
+names(horizon_uniq)
+# confirm no duplicates
+length(unique(horizon_uniq$organization))
+```
+
+```{r}
+table(horizon_uniq$funding_duration)
+```
+
+What percent of formally established OSPOs have permanent funding?
+```{r}
+tmp <- subset(horizon_uniq, function_mc == "A formally established OSPO")
+table(tmp$funding_duration)
 ```

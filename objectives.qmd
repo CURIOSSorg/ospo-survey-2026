@@ -32,6 +32,7 @@ cfg <- config::get()
 ```{r}
 mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
+ospo_loc <- read_tsv(file.path(cfg$data_path, "ospo_location.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 objs <- read_tsv(file.path(cfg$data_path, "objectives.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 qual <- read_tsv(file.path(cfg$data_path, "qual.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
@@ -49,7 +50,7 @@ dupes <- org_responses |>
   ungroup()
 
 # Keep commented for privacy!!
-# dupes
+# dupes |> select(-response)
 ```
 
 Okay, well, there is one disagreement, but I know that university, and they're not part of an OSPO Network, so I'm pretty inclined to side with respondent 1 over respondent 2 on this and say they serve their own institution, and no other institutions. I think the intent of the "beyond our institution" thing was really about official services like OSPO networks. And the question says who do you "primarily" serve.
@@ -70,6 +71,7 @@ rows_to_keep <- sort(tmp$first_occurrence_idx)
 
 # One response per org
 org_responses_filt <- org_responses[rows_to_keep, ]
+nrow(org_responses_filt)
 ```
 
 ```{r}
@@ -93,15 +95,17 @@ objs_numeric <- objs |>
   mutate(across(everything(), ~ score_map[.x]))
 ```
 
+## Per-OSPO
+
 I strongly suspect that there will be differences between responses from the same institution. Let's check.
 
 ```{r}
 org_objs <- cbind(org_responses$organization, objs_numeric)
-names(org_objs)[1] <- "org"
+names(org_objs)[1] <- "organization"
 dupes2 <- org_objs |>
-  group_by(org) |>
+  group_by(organization) |>
   filter(n() > 1) |>
-  arrange(org, .by_group = TRUE)
+  arrange(organization, .by_group = TRUE)
 
 # Keep commented for privacy!!
 # dupes2
@@ -127,7 +131,7 @@ I'm just going to take the average score per organization.
 
 ```{r}
 org_objs_avgd <- org_objs |>
-  group_by(org) |>
+  group_by(organization) |>
   summarise(across(everything(), ~ mean(.x, na.rm = TRUE)))
 
 dim(org_objs_avgd)
@@ -140,6 +144,70 @@ Check out the overall scores for each objective
 sort(colSums(org_objs_avgd[,-1]), decreasing = TRUE)
 ```
 
+### Objectives by OSPO location
+Feedback from Clare: does the objective vary based on OSPO location?
+
+First, we'll get one set of locations for each OSPO using my heuristic: if anyone from that organization said yes, then that organization's response is yes.
+
+```{r}
+ospo_loc$organization <- org_responses$organization
+ospo_loc_filtered <- consolidate_org_responses_yn(ospo_loc)
+dim(ospo_loc_filtered)
+```
+
+For more interpretable results, let's look at TTO-only OSPOs and library-only OSPOs.
+
+```{r}
+# Merge the (filtered) location and objective dataframes 
+loc_obj <- left_join(ospo_loc_filtered, org_objs_avgd, by = "organization")
+# Remove the "joint" column which is unnecessary and confusing
+loc_obj <- subset(loc_obj, select = -joint)
+dim(loc_obj)
+```
+
+```{r}
+lib_only <- loc_obj |>
+  filter(
+    library == "Yes",
+    if_all(admin:ai_institute, ~ .x == "No")
+  )
+
+lib_scores <- lib_only |>
+  select(where(is.numeric)) |>
+  colSums(na.rm = TRUE)
+
+sort(lib_scores, decreasing = TRUE)
+```
+
+```{r}
+tto_only <- loc_obj |>
+  filter(
+    tto == "Yes",
+    if_all(
+      where(~ all(.x %in% c("Yes", "No"), na.rm = TRUE)) & !tto,
+      ~ .x == "No"
+    )
+  )
+
+tto_scores <- tto_only |>
+  select(where(is.numeric)) |>
+  colSums(na.rm = TRUE)
+
+sort(tto_scores, decreasing = TRUE)
+```
+
+Cool. We can see at a glance that there are some differences here, especially in policy and community.
+
+```{r}
+# Spearman's rho test (uses t-approximation due to ties in tto_scores)
+spearman_res <- cor.test(tto_scores, lib_scores, method = "spearman", exact = FALSE)
+print(spearman_res)
+```
+
+Looks like the rank orders are significantly different.
+
+## Per-person
+
 Does taking everybody's response equally, without any average, affect the ranking?
 
 ```{r}
@@ -151,7 +219,68 @@ dim(objs_numeric)
 sort(colSums(objs_numeric), decreasing = TRUE)
 ```
 
-Policy, support, and engagement are switched around, but everything else is the same as before. I think I'll report the per-person scores rather than the per-organization scores, since they are simpler to understand.
+Policy, support, and engagement are switched around, but everything else is the same as before. 
+
+The person who answered NA to objectives did answer the question about location. Let's keep them in, join the data frames, and then remove them.
+
+```{r}
+# Convert all text columns to numeric values
+objs_numeric_keep_NA <- objs |>
+  mutate(across(everything(), ~ score_map[.x]))
+org_objs2 <- cbind(org_responses$organization, objs_numeric_keep_NA)
+names(org_objs2)[1] <- "organization"
+
+# Make sure the rows correspond
+identical(org_objs2$organization, ospo_loc$organization)
+
+# Join data frames
+loc_obj_per_person <- cbind(org_objs_keep_NA, ospo_loc)
+# Remove all rows that contain any NA 
+loc_obj_per_person <- na.omit(loc_obj_per_person)
+# Drop unneeded columns
+loc_obj_per_person <- loc_obj_per_person |> select(-organization, -joint)
+head(loc_obj_per_person)
+```
+
+Now let's do what we did before, splitting into library vs. TTO groups, but this time our sample size will be a bit larger because we are counting respondents, not organizations.
+
+```{r}
+lib_only_pp <- loc_obj_per_person |>
+  filter(
+    library == "Yes",
+    if_all(admin:ai_institute, ~ .x == "No")
+  )
+
+lib_scores_pp <- lib_only_pp |>
+  select(where(is.numeric)) |>
+  colSums(na.rm = TRUE)
+
+sort(lib_scores_pp, decreasing = TRUE)
+```
+
+```{r}
+tto_only_pp <- loc_obj_per_person |>
+  filter(
+    tto == "Yes",
+    if_all(
+      where(~ all(.x %in% c("Yes", "No"), na.rm = TRUE)) & !tto,
+      ~ .x == "No"
+    )
+  )
+
+tto_scores_pp <- tto_only_pp |>
+  select(where(is.numeric)) |>
+  colSums(na.rm = TRUE)
+
+sort(tto_scores_pp, decreasing = TRUE)
+```
+```{r}
+# Spearman's rho test (uses t-approximation due to ties in tto_scores)
+spearman_res <- cor.test(tto_scores_pp, lib_scores_pp, method = "spearman", exact = FALSE)
+print(spearman_res)
+```
+Again the ranks are not correlated.
+
 
 # Metrics
 This was a slightly sneaky "simple multiple choice" question in that it doesn't use an "other" field, but it was followed by a very closely related qualitative question. Let's save those qualitative answers to a file for coding. Note that for this one we are NOT filtering to one response per institution.

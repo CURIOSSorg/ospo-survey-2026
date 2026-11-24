@@ -53,6 +53,7 @@ table(mc_simple$expectations)
 table(mc_simple$funding_duration)
 ```
 
+
 Just for my own reassurance, I want to run some chi-square tests on some variables that I suspect might be correlated.
 
 ```{r}
