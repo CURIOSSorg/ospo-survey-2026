@@ -37,7 +37,7 @@ cfg <- config::get()
 org_responses <- read_excel(file.path(cfg$curated_path, "orgs.xlsx"), sheet="responses")
 codebook <- read_excel(file.path(cfg$data_path, "codebook.xlsx"))
 mc_simple <- read_tsv(file.path(cfg$data_path, "mc_simple.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
-
+mc_complex <- read_tsv(file.path(cfg$data_path, "mc_complex.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 ospo_funding <- read_tsv(file.path(cfg$data_path, "ospo_funding.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 blockers <- read_tsv(file.path(cfg$data_path, "blockers.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)
 matrix_other <- read_tsv(file.path(cfg$data_path, "matrix_other.tsv"), show_col_types = FALSE, skip_empty_rows = FALSE)

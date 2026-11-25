@@ -246,6 +246,7 @@ The person who answered NA to objectives did answer the question about location.
 # Convert all text columns to numeric values
 objs_numeric_keep_NA <- objs |>
   mutate(across(everything(), ~ score_map[.x]))
+
 org_objs2 <- cbind(org_responses$organization, objs_numeric_keep_NA)
 names(org_objs2)[1] <- "organization"
 
@@ -253,7 +254,7 @@ names(org_objs2)[1] <- "organization"
 identical(org_objs2$organization, ospo_loc$organization)
 
 # Join data frames
-loc_obj_per_person <- cbind(org_objs_keep_NA, ospo_loc)
+loc_obj_per_person <- cbind(objs_numeric_keep_NA, ospo_loc)
 # Remove all rows that contain any NA 
 loc_obj_per_person <- na.omit(loc_obj_per_person)
 # Drop unneeded columns
