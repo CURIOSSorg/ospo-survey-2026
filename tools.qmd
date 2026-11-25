@@ -107,7 +107,9 @@ For this one, let's not consolidate by org since AI usage is largely an individu
 
 ```{r}
 # Count rows where ai_use_none OR ai_use_avoid is "Yes"
-count <- sum(ai_usage$ai_use_none == "Yes" | ai_usage$ai_use_avoid == "Yes", na.rm = TRUE)
+count <- sum(ai_usage$ai_use_none == "Yes" | ai_usage$ai_use_avoid == "Yes")
+# make sure there are no NAs
+any(is.na(ai_usage))
 (nrow(ai_usage) - count) / nrow(ai_usage)
 ```
 

@@ -161,6 +161,23 @@ Meh, maybe the TTO hypothesis is not that interesting. It looks like the respons
 
 ## Basic statistics
 
+Let's get the mean amount of staff time per OSPO. We will have to use the midpoints or other estimates for each of the survey categories.
+
+```{r}
+valid_counts <- time_counts[names(time_counts) != "I don't know"]
+
+midpoints <- c(
+  "Less than 0.5 FTE"     = 0.25,
+  "Between 0.5 and 1 FTE" = 0.75,
+  "1 to 2 FTE"            = 1.50,
+  "2 to 5 FTE"            = 3.50,
+  "More than 5 FTE"       = 6.00
+)
+
+mean_fte <- weighted.mean(midpoints[names(valid_counts)], valid_counts)
+mean_fte
+```
+
 ```{r}
 # Fisher's exact test: are FTE size and establishment related?
 fisher.test(table(combined$staff_time, combined$function_mc), simulate.p.value = TRUE)

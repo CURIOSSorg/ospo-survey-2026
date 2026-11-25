@@ -32,6 +32,7 @@ library(dplyr)
 library(tibble)
 library(readr)
 library(tidyr)
+library(purrr)
 
 source("utils.R")
 
@@ -171,9 +172,38 @@ org_groups <- loc |>
   filter(!is.na(group)) |>
   select(organization, group)
 
-head(org_groups)
+# Keep commented for privacy
+# head(org_groups)
 # Check group sample sizes
-count(org_groups, group)
+# count(org_groups, group)
+```
+
+Calculate engagement in the nine "super-categories" by group
+
+```{r}
+# Calculate % with at least one "Yes" per group
+calc_yes_pct <- function(df, df_name, group_lookup) {
+  df %>%
+    inner_join(group_lookup, by = "organization") %>%
+    mutate(
+      # TRUE if any column (besides organization and group) equals "Yes"
+      any_yes = if_any(-c(organization, group), ~ .x == "Yes")
+    ) %>%
+    group_by(group) %>%
+    summarise(
+      n_orgs = n(),
+      n_yes = sum(any_yes, na.rm = TRUE),
+      pct_yes = mean(any_yes, na.rm = TRUE) * 100,
+      .groups = "drop"
+    ) %>%
+    mutate(dataset = df_name, .before = 1)
+}
+
+# Run function across all data frames and combine into one summary table
+results <- imap(df_list, ~ calc_yes_pct(.x, .y, org_groups)) %>%
+  list_rbind()
+
+results
 ```
 
 ```{r}
@@ -193,7 +223,8 @@ services_long <- df_list |>
   ) |>
   filter(!is.na(offered))
 
-head(services_long)
+# Keep commented for privacy!
+# head(services_long)
 ```
 
 ```{r}
@@ -217,6 +248,46 @@ subset(service_comparison, p_val < 0.05)
 ```
 
 Technically none of these are statistically significant by the Fisher's exact test, but I think they are all socially significant.
+
+Let's export all rows, and the most interesting columns, to a tsv.
+
+```{r}
+# Filter codebook to these sata questions only (others will have NA in tip column)
+service_lookup <- codebook |>
+  filter(!is.na(tip)) |>
+  distinct(nickname, .keep_all = TRUE) |>
+  select(nickname, service_full = tip)
+
+category_labels <- c(
+  bp    = "Developing and sharing best practices",
+  edu   = "Educational efforts",
+  ext   = "External partnerships and tech transfer",
+  tools = "Supporting tools and infrastructure",
+  cb    = "Community building",
+  ps    = "Directly supporting open source projects",
+  ap    = "Advocacy and policy",
+  fs    = "Funding and financial support",
+  ospo  = "OSPO operations and strategy"
+)
+
+# Join full service text and replace category codes
+service_comparison_clean <- service_comparison |>
+  left_join(service_lookup, by = c("service" = "nickname")) |>
+  mutate(
+    # coalesce() keeps the original nickname if a match isn't found
+    service  = coalesce(service_full, service),
+    category = recode(category, !!!category_labels)
+  ) |>
+  select(-service_full)
+```
+
+```{r}
+service_comparison_clean <- service_comparison_clean |>
+  select(-p_val, -max_spread) |>
+  arrange(p_adj)
+
+write_df_to_file(service_comparison_clean, "service_comparison.tsv")
+```
 
 ## Quantifying "commonness" or "pervasiveness"
 
@@ -309,8 +380,37 @@ reach_scores
 Print as percentages
 
 ```{r}
-round(reach_scores/nrow(df_list2[[1]])*100, digits = 1)
+pcts <- round(reach_scores/nrow(df_list2[[1]])*100, digits = 1)
 ```
+
+Create a data frame for plotting in figures.qmd
+
+```{r}
+df <- data.frame(
+  category  = unname(category_labels[names(pcts)]),
+  value     = unname(pcts),
+  row.names = NULL
+)
+df
+```
+
+Get average tasks per person
+
+```{r}
+summary_stats <- bind_cols(df_list2) |>
+  mutate(total_activities = rowSums(across(everything()), na.rm = TRUE)) 
+
+dim(summary_stats)
+
+summary_stats  |>
+  summarise(
+    mean_activities = mean(total_activities),
+    median_activities = median(total_activities),
+    sd_activities = sd(total_activities)
+  )
+```
+
+^ This show the number of activities per person, where the col # is the number of activities they could choose from (here 51)
 
 # Which activities take the most time?
 

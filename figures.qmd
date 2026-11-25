@@ -165,6 +165,115 @@ ggsave(
 )
 ```
 
+## Activities
+
+```{r}
+df <- data.frame(
+  category = c(
+    "Developing and sharing best practices",
+    "Educational efforts",
+    "External partnerships and tech transfer",
+    "Advocacy and policy",
+    "OSPO operations and strategy",
+    "Community building",
+    "Supporting tools and infrastructure",
+    "Directly supporting open source projects",
+    "Funding and financial support"
+  ),
+  value = c(0.939, 0.939, 0.939, 0.939, 0.879, 0.848, 0.788, 0.788, 0.758)
+)
+df <- reorder_factor_by_column(df, category, value, descending = FALSE)
+```
+
+
+```{r}
+plt <- basic_bar_chart(
+  df,
+  x_var = "category",
+  y_var = "value",
+  title = "OSPO actvities",
+  ylabel = "% of OSPO staff who do this",
+  plot_title_margin_b = 5,
+  x_axis_title_margin_t = 5,
+  horizontal = TRUE,
+  show_axis_title_x = TRUE,
+  show_axis_title_y = FALSE
+)
+
+plt <- plt +
+  scale_y_continuous(
+  breaks = c(0.25, 0.5, 0.75, 1.0),
+  limits = c(0, 1.25),
+  labels = scales::percent
+  )
+
+plt
+```
+
+```{r}
+ggsave(
+  filename = file.path(cfg$figure_path, "activities_bar.png"),
+  width = 8,
+  height = 4,
+  units = "in",
+  dpi = 400,
+  bg = "#FFFFFF"
+)
+```
+
+## Time spent on activities
+```{r}
+df <- data.frame(
+  category = c(
+    "OSPO operations and strategy",
+    "Community building",
+    "External partnerships and tech transfer",
+    "Directly supporting open source projects",
+    "Educational efforts",
+    "Advocacy and policy",
+    "Developing and sharing best practices",
+    "Supporting tools and infrastructure",
+    "Funding and financial support"
+  ),
+  value = c(9, 6, 7, 5, 3, 1, 0, 1, 0)
+)
+
+df <- reorder_factor_by_column(df, category, value, descending = FALSE)
+```
+
+```{r}
+plt <- basic_bar_chart(
+  df,
+  x_var = "category",
+  y_var = "value",
+  title = "Time-consuming OSPO tasks",
+  ylabel = "# of OSPO staff who ranked this #1",
+  plot_title_margin_b = 5,
+  x_axis_title_margin_t = 5,
+  horizontal = TRUE,
+  show_axis_title_x = TRUE,
+  show_axis_title_y = FALSE
+)
+
+plt <- plt +
+  scale_y_continuous(
+    breaks = c(0, 2, 4, 6, 8, 10)
+  )
+
+plt
+```
+
+```{r}
+ggsave(
+  filename = file.path(cfg$figure_path, "time_spent_bar.png"),
+  width = 8,
+  height = 4,
+  units = "in",
+  dpi = 400,
+  bg = "#FFFFFF"
+)
+```            
+ 
 
 # Scatter plot
 ## Activities

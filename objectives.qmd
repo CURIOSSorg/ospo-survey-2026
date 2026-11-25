@@ -11,6 +11,7 @@ Research questions:
 - What are the main objectives of your OSPO or OSPO-like function?\
 - Does your OSPO currently track any metrics or indicators of its impact?\
 - What is your elevator pitch for why your OSPO matters?\
+- Which audiences do you engage with regularly as part of your Open Source work?
 
 
 # Import packages, utilities, and config variables
@@ -155,7 +156,7 @@ ospo_loc_filtered <- consolidate_org_responses_yn(ospo_loc)
 dim(ospo_loc_filtered)
 ```
 
-For more interpretable results, let's look at TTO-only OSPOs and library-only OSPOs.
+For interpretable results, let's look at TTO-only OSPOs and library-only OSPOs.
 
 ```{r}
 # Merge the (filtered) location and objective dataframes 
@@ -205,6 +206,24 @@ print(spearman_res)
 ```
 
 Looks like the rank orders are significantly different.
+
+### Other locations
+```{r}
+admin_only <- loc_obj |>
+  filter(
+    admin == "Yes",
+    if_all(
+      where(~ all(.x %in% c("Yes", "No"), na.rm = TRUE)) & !admin,
+      ~ .x == "No"
+    )
+  )
+
+admin_scores <- admin_only |>
+  select(where(is.numeric)) |>
+  colSums(na.rm = TRUE)
+
+sort(admin_scores, decreasing = TRUE)
+```
 
 ## Per-person
 
